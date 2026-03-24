@@ -2,10 +2,10 @@ import os
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from backend.scoring import compute_scores
-from backend.reporting import generate_report
+from scoring import compute_scores
+from reporting import generate_report
 from typing import Optional
-from backend.valuation import estimate_property_value
+from valuation import estimate_property_value
 
 app = FastAPI()
 
