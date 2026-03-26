@@ -2,21 +2,25 @@ import os
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from scoring import compute_scores
-from reporting import generate_report
+from backend.scoring import compute_scores
+from backend.reporting import generate_report
 from typing import Optional
-from valuation import estimate_property_value
+from backend.valuation import estimate_property_value
 
 app = FastAPI()
 
+_local_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+]
+_frontend_url = os.getenv("FRONTEND_URL", "")
+allowed_origins = _local_origins + ([_frontend_url] if _frontend_url else [])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,14 +64,15 @@ async def analyze(
     property_estimated_value = None
     avg_m2_price = None
 
-    if has_house == "yes" and district and square_meters:
-        try:
-            valuation_result = estimate_property_value(district, float(square_meters))
-            property_estimated_value = valuation_result.get("estimated_value")
-            avg_m2_price = valuation_result.get("avg_m2_price")
-        except Exception:
-            property_estimated_value = None
-            avg_m2_price = None
+    if has_house == "yes" and city and square_meters:
+       try:
+        valuation_result = estimate_property_value(city, district, float(square_meters))
+        property_estimated_value = valuation_result.get("property_estimated_value")
+        avg_m2_price = valuation_result.get("avg_m2_price")
+       except Exception:
+        property_estimated_value = None
+        avg_m2_price = None
+
     form_data = {
     "gender": gender,
     "parents_divorced": parents_divorced,
