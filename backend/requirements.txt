@@ -3,3 +3,6 @@ uvicorn[standard]
 python-multipart
 reportlab
 pandas
+pdfplumber
+pytesseract
+Pillow
