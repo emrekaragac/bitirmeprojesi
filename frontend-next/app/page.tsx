@@ -260,9 +260,9 @@ export default function Page() {
             </span>
           </div>
           <div className="ml-auto">
-            <span className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-3 py-1 rounded-full">
-              Beta
-            </span>
+            <a href="/admin" className="text-xs text-slate-400 hover:text-indigo-600 font-medium transition px-2 py-1 rounded-lg hover:bg-indigo-50">
+              Admin →
+            </a>
           </div>
         </div>
       </nav>
