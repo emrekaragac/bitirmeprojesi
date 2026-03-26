@@ -97,32 +97,37 @@ def estimate_car_value(marka: str, model: str, yil: int, has_damage: bool = Fals
 
 
 def estimate_property_value(city: str, district: str, square_meters: float) -> dict:
-    """Mülk değeri tahmini: şehir, ilçe, m² bilgisine göre"""
+    """Mulk degeri tahmini: sehir, ilce, m2 bilgisine gore"""
     avg_m2_price = None
     district_found = False
 
-    # Önce CSV'den ilçe bazlı fiyat dene (İstanbul detaylı)
-    if district:
-        for csv_path in ["backend/istanbul_property_reference.csv",
-                         "backend/turkiye_property_reference.csv"]:
-            try:
-                df = pd.read_csv(csv_path)
-                district_normalized = normalize_turkish(district)
-                df["district_normalized"] = df["district"].apply(normalize_turkish)
-                match = df[df["district_normalized"] == district_normalized]
-                if not match.empty:
-                    avg_m2_price = float(match.iloc[0]["avg_m2_price"])
-                    district_found = True
-                    break
-            except Exception:
-                continue
+    # 1) Istanbul + ilce secildiyse istanbul_property_reference.csv'den bak
+    if city and normalize_turkish(city) == "istanbul" and district:
+        try:
+            df = pd.read_csv("backend/istanbul_property_reference.csv")
+            district_normalized = normalize_turkish(district)
+            df["district_normalized"] = df["district"].apply(normalize_turkish)
+            match = df[df["district_normalized"] == district_normalized]
+            if not match.empty:
+                avg_m2_price = float(match.iloc[0]["avg_m2_price"])
+                district_found = True
+        except Exception:
+            pass
 
-    # İlçe bulunamazsa şehir bazlı fiyat kullan
+    # 2) Diger sehirler (veya Istanbul ilce bulunamadiysa) → turkiye_property_reference.csv
     if avg_m2_price is None and city:
-        city_key = normalize_turkish(city)
-        avg_m2_price = CITY_M2_PRICES.get(city_key, 20_000)
+        try:
+            df = pd.read_csv("backend/turkiye_property_reference.csv")
+            city_normalized = normalize_turkish(city)
+            df["city_normalized"] = df["city"].apply(normalize_turkish)
+            match = df[df["city_normalized"] == city_normalized]
+            if not match.empty:
+                avg_m2_price = float(match.iloc[0]["avg_m2_price"])
+                district_found = True
+        except Exception:
+            pass
 
-    # Her ikisi de yoksa ulusal ortalama
+    # 3) Hicbiri bulunamazsa ulusal ortalama
     if avg_m2_price is None:
         avg_m2_price = 22_000
 

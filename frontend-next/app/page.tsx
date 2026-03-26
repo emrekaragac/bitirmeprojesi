@@ -152,7 +152,7 @@ function SectionTitle({ icon, children }: { icon: string; children: React.ReactN
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function Page() {
-  const [step, setStep] = useState(0)
+  const [step, setStep] = useState(1)
 
   // Personal
   const [gender, setGender] = useState("")
@@ -268,47 +268,6 @@ export default function Page() {
       </nav>
 
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
-
-        {/* ── HERO ───────────────────────────────────────────────────── */}
-        {step === 0 && !result && (
-          <div className="rounded-3xl overflow-hidden shadow-lg">
-            <div className="bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 px-8 py-10 text-white">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="bg-white/20 rounded-2xl p-3 backdrop-blur-sm">
-                  <BursIQLogo size={44} />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-black tracking-tight">BursIQ</h1>
-                  <p className="text-indigo-200 text-sm font-medium">Scholarship Intelligence System</p>
-                </div>
-              </div>
-              <p className="text-indigo-100 leading-relaxed max-w-xl">
-                Fill in the 5-section form below. Upload your <strong>ruhsat</strong> and <strong>tapu</strong> documents — our OCR engine will extract values automatically and calculate your scholarship priority score.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                {["OCR Document Reading", "Asset Valuation", "AI Scoring", "Priority Report"].map(t => (
-                  <span key={t} className="text-xs bg-white/20 backdrop-blur-sm text-white px-3 py-1.5 rounded-full font-medium border border-white/20">
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="bg-white px-8 py-5 flex items-center gap-6 border-t border-slate-100">
-              {[["0–100", "Needs Score"], ["5", "Sections"], ["OCR", "Auto Extract"]].map(([val, label]) => (
-                <div key={label} className="text-center">
-                  <div className="text-2xl font-black text-indigo-600">{val}</div>
-                  <div className="text-xs text-slate-400 font-medium">{label}</div>
-                </div>
-              ))}
-              <button
-                onClick={() => setStep(1)}
-                className="ml-auto rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold px-6 py-3 hover:shadow-lg hover:shadow-indigo-200 transition-all text-sm"
-              >
-                Start Application →
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* ── FORM STEPS ─────────────────────────────────────────────── */}
         {step >= 1 && step <= 4 && (
@@ -523,12 +482,14 @@ export default function Page() {
 
             {/* Nav Buttons */}
             <div className="flex gap-3">
-              <button
-                onClick={() => setStep(s => s - 1)}
-                className="flex-1 rounded-xl border-2 border-slate-200 text-slate-600 font-semibold py-3 hover:border-slate-300 transition text-sm"
-              >
-                ← Back
-              </button>
+              {step > 1 && (
+                <button
+                  onClick={() => setStep(s => s - 1)}
+                  className="flex-1 rounded-xl border-2 border-slate-200 text-slate-600 font-semibold py-3 hover:border-slate-300 transition text-sm"
+                >
+                  ← Back
+                </button>
+              )}
               {step < 4 ? (
                 <button
                   onClick={() => setStep(s => s + 1)}
@@ -731,7 +692,7 @@ export default function Page() {
                 </a>
               )}
               <button
-                onClick={() => { setResult(null); setStep(0) }}
+                onClick={() => { setResult(null); setStep(1) }}
                 className="flex-1 rounded-xl border-2 border-slate-200 text-slate-600 font-semibold py-3.5 hover:border-slate-300 transition text-sm"
               >
                 ← New Analysis
