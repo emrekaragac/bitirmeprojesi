@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:9001"
 
@@ -278,12 +278,22 @@ export default function AdminPage() {
                 </ul>
               </div>
 
-              <button
-                onClick={() => setDetail(null)}
-                className="w-full mt-2 rounded-xl bg-slate-100 text-slate-700 font-semibold py-2.5 text-sm hover:bg-slate-200 transition"
-              >
-                Close
-              </button>
+              <div className="flex gap-2 mt-2">
+                <a
+                  href={`${API}/reports/report_${detail.total_score}.pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold py-2.5 text-sm text-center hover:shadow-lg transition"
+                >
+                  📄 PDF Report
+                </a>
+                <button
+                  onClick={() => setDetail(null)}
+                  className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-2.5 text-sm hover:bg-slate-200 transition"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

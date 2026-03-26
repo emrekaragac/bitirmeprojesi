@@ -680,24 +680,13 @@ export default function Page() {
               ) : <p className="text-slate-400 text-sm">No reasons returned.</p>}
             </Card>
 
-            {/* Report + New Analysis */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              {result.report && (
-                <a
-                  href={`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:9001"}/${result.report}`}
-                  target="_blank" rel="noreferrer"
-                  className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3.5 text-center hover:shadow-lg hover:shadow-indigo-200 transition-all text-sm"
-                >
-                  📄 Open PDF Report
-                </a>
-              )}
-              <button
-                onClick={() => { setResult(null); setStep(1) }}
-                className="flex-1 rounded-xl border-2 border-slate-200 text-slate-600 font-semibold py-3.5 hover:border-slate-300 transition text-sm"
-              >
-                ← New Analysis
-              </button>
-            </div>
+            {/* New Analysis */}
+            <button
+              onClick={() => { setResult(null); setStep(1) }}
+              className="w-full rounded-xl border-2 border-slate-200 text-slate-600 font-semibold py-3.5 hover:border-slate-300 transition text-sm"
+            >
+              ← New Analysis
+            </button>
           </div>
         )}
 
