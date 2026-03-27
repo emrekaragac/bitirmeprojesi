@@ -23,6 +23,10 @@ type App = {
   total_score: number
   priority: string
   decision: string
+  first_name: string
+  last_name: string
+  university: string
+  department: string
   gender: string
   monthly_income: string
   has_car: string
@@ -89,9 +93,13 @@ export default function AdminPage() {
   }
 
   const filtered = apps.filter(a =>
-    !search || a.id.toString().includes(search) ||
-    (a.city || "").toLowerCase().includes(search.toLowerCase()) ||
-    (a.gender || "").toLowerCase().includes(search.toLowerCase())
+    !search ||
+    a.id.toString().includes(search) ||
+    (a.first_name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (a.last_name  || "").toLowerCase().includes(search.toLowerCase()) ||
+    (a.university || "").toLowerCase().includes(search.toLowerCase()) ||
+    (a.city       || "").toLowerCase().includes(search.toLowerCase()) ||
+    (a.gender     || "").toLowerCase().includes(search.toLowerCase())
   )
 
   if (!authed) return (
@@ -133,7 +141,7 @@ export default function AdminPage() {
         <div className="ml-auto flex gap-3 items-center">
           <input
             type="text"
-            placeholder="Search by ID, city, gender…"
+            placeholder="Search by name, city, university…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="rounded-xl px-4 py-2 text-sm text-slate-800 bg-white/90 outline-none w-56"
@@ -164,7 +172,7 @@ export default function AdminPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  {["#ID","Date","Score","Priority","Decision","Gender","Income","Car","House","City","Siblings","Family","Action"].map(h => (
+                  {["#ID","Ad Soyad","Üniversite","Tarih","Skor","Öncelik","Karar","Cinsiyet","Gelir","Araba","Ev","Şehir","İşlem"].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -173,6 +181,12 @@ export default function AdminPage() {
                 {filtered.map((a, i) => (
                   <tr key={a.id} className={`border-b border-slate-50 hover:bg-indigo-50/30 transition ${i % 2 === 0 ? "" : "bg-slate-50/30"}`}>
                     <td className="px-4 py-3 font-mono text-slate-400 text-xs">#{a.id}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-slate-800 text-sm whitespace-nowrap">
+                        {a.first_name || a.last_name ? `${a.first_name} ${a.last_name}`.trim() : "—"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 text-xs whitespace-nowrap">{a.university || "—"}</td>
                     <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{a.submitted_at.slice(0,16)}</td>
                     <td className="px-4 py-3">
                       <span className={`text-xl font-black ${a.total_score >= 75 ? "text-red-600" : a.total_score >= 50 ? "text-amber-600" : "text-green-600"}`}>
@@ -194,8 +208,6 @@ export default function AdminPage() {
                     <td className="px-4 py-3 text-center">{a.has_car === "yes" ? "✅" : "❌"}</td>
                     <td className="px-4 py-3 text-center">{a.has_house === "yes" ? "✅" : "❌"}</td>
                     <td className="px-4 py-3 text-slate-700 text-xs">{a.city || "—"}</td>
-                    <td className="px-4 py-3 text-center text-slate-700">{a.siblings_count || "0"}</td>
-                    <td className="px-4 py-3 text-center text-slate-700">{a.family_size || "—"}</td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => loadDetail(a.id)}
@@ -207,7 +219,7 @@ export default function AdminPage() {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={13} className="text-center text-slate-400 py-12 text-sm">No applications yet.</td></tr>
+                  <tr><td colSpan={13} className="text-center text-slate-400 py-12 text-sm">Henüz başvuru yok.</td></tr>
                 )}
               </tbody>
             </table>
@@ -221,8 +233,15 @@ export default function AdminPage() {
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
               <div>
-                <h2 className="font-black text-lg">Application #{detail.id}</h2>
-                <p className="text-indigo-200 text-xs">{detail.submitted_at}</p>
+                <h2 className="font-black text-lg">
+                  {detail.form_data?.first_name || detail.form_data?.last_name
+                    ? `${detail.form_data.first_name ?? ""} ${detail.form_data.last_name ?? ""}`.trim()
+                    : `Başvuru #${detail.id}`}
+                </h2>
+                <p className="text-indigo-200 text-xs">
+                  {detail.form_data?.university ? `${detail.form_data.university} · ` : ""}
+                  #{detail.id} · {detail.submitted_at.slice(0,16)}
+                </p>
               </div>
               <div className="text-right">
                 <div className="text-4xl font-black">{detail.total_score}</div>

@@ -35,6 +35,16 @@ def root():
 
 @app.post("/analyze")
 async def analyze(
+    # ── Aday Kimlik Bilgileri ──
+    first_name:  str = Form(""),
+    last_name:   str = Form(""),
+    tc_no:       str = Form(""),
+    birth_date:  str = Form(""),
+    phone:       str = Form(""),
+    email:       str = Form(""),
+    university:  str = Form(""),
+    department:  str = Form(""),
+    grade:       str = Form(""),
     # Kisisel
     gender: str = Form(...),
     # Aile
@@ -130,6 +140,17 @@ async def analyze(
 
     # --- Skor ---
     form_data = {
+        # Kimlik bilgileri
+        "first_name":  first_name,
+        "last_name":   last_name,
+        "tc_no":       tc_no,
+        "birth_date":  birth_date,
+        "phone":       phone,
+        "email":       email,
+        "university":  university,
+        "department":  department,
+        "grade":       grade,
+        # Form
         "gender": gender,
         "parents_divorced": parents_divorced,
         "father_working":   father_working,

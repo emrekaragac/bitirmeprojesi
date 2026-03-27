@@ -91,7 +91,7 @@ function BursIQLogo({ size = 40 }: { size?: number }) {
 }
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
-const STEPS = ["Personal", "Family", "Financial", "Vehicle", "Property"]
+const STEPS = ["Applicant Info", "Personal", "Family", "Financial", "Assets"]
 function StepBar({ active }: { active: number }) {
   return (
     <div className="flex items-center gap-1 mb-8">
@@ -152,7 +152,18 @@ function SectionTitle({ icon, children }: { icon: string; children: React.ReactN
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function Page() {
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(0)
+
+  // ── Aday Kimlik ──
+  const [firstName,  setFirstName]  = useState("")
+  const [lastName,   setLastName]   = useState("")
+  const [tcNo,       setTcNo]       = useState("")
+  const [birthDate,  setBirthDate]  = useState("")
+  const [phone,      setPhone]      = useState("")
+  const [email,      setEmail]      = useState("")
+  const [university, setUniversity] = useState("")
+  const [department, setDepartment] = useState("")
+  const [grade,      setGrade]      = useState("")
 
   // Personal
   const [gender, setGender] = useState("")
@@ -195,6 +206,15 @@ export default function Page() {
     setLoading(true); setError(""); setResult(null)
     try {
       const fd = new FormData()
+      fd.append("first_name",  firstName)
+      fd.append("last_name",   lastName)
+      fd.append("tc_no",       tcNo)
+      fd.append("birth_date",  birthDate)
+      fd.append("phone",       phone)
+      fd.append("email",       email)
+      fd.append("university",  university)
+      fd.append("department",  department)
+      fd.append("grade",       grade)
       fd.append("gender", gender)
       fd.append("parents_divorced", parentsDivorced)
       fd.append("father_working", fatherWorking)
@@ -223,7 +243,7 @@ export default function Page() {
       const res = await fetch(`${apiUrl}/analyze`, { method: "POST", body: fd })
       if (!res.ok) throw new Error((await res.text()) || "Request failed")
       setResult(await res.json())
-      setStep(5)
+      setStep(6)
     } catch (e) {
       console.error(e); setError("Something went wrong. Please try again.")
     } finally {
@@ -240,7 +260,7 @@ export default function Page() {
     : result?.decision === "Under Review" ? "text-amber-600 bg-amber-50 border-amber-200"
     : "text-red-600 bg-red-50 border-red-200"
 
-  const canSubmit = gender && parentsDivorced && fatherWorking && motherWorking &&
+  const canSubmit = firstName && lastName && gender && parentsDivorced && fatherWorking && motherWorking &&
     everyoneHealthy && monthlyIncome && otherScholarship && worksPartTime &&
     isRenting && hasCar && hasHouse
 
@@ -270,9 +290,54 @@ export default function Page() {
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
 
         {/* ── FORM STEPS ─────────────────────────────────────────────── */}
-        {step >= 1 && step <= 4 && (
+        {step >= 0 && step <= 4 && (
           <>
-            <StepBar active={step - 1} />
+            <StepBar active={step} />
+
+            {/* Step 0: Applicant Info */}
+            {step === 0 && (
+              <Card>
+                <SectionTitle icon="🪪">Applicant Information</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="First Name *">
+                    <input value={firstName} onChange={e => setFirstName(e.target.value)} className={inp} placeholder="e.g. Ayşe" />
+                  </Field>
+                  <Field label="Last Name *">
+                    <input value={lastName} onChange={e => setLastName(e.target.value)} className={inp} placeholder="e.g. Yılmaz" />
+                  </Field>
+                  <Field label="TC Identity Number *">
+                    <input value={tcNo} onChange={e => setTcNo(e.target.value)} className={inp} placeholder="11 digit TC No" maxLength={11} />
+                  </Field>
+                  <Field label="Date of Birth *">
+                    <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className={inp} />
+                  </Field>
+                  <Field label="Phone Number *">
+                    <input value={phone} onChange={e => setPhone(e.target.value)} className={inp} placeholder="05XX XXX XX XX" />
+                  </Field>
+                  <Field label="E-mail Address *">
+                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inp} placeholder="example@email.com" />
+                  </Field>
+                  <Field label="University *">
+                    <input value={university} onChange={e => setUniversity(e.target.value)} className={inp} placeholder="e.g. Boğaziçi Üniversitesi" />
+                  </Field>
+                  <Field label="Department *">
+                    <input value={department} onChange={e => setDepartment(e.target.value)} className={inp} placeholder="e.g. Computer Engineering" />
+                  </Field>
+                  <Field label="Grade / Year *">
+                    <select value={grade} onChange={e => setGrade(e.target.value)} className={sel}>
+                      <option value="">Select</option>
+                      <option value="1">1st Year</option>
+                      <option value="2">2nd Year</option>
+                      <option value="3">3rd Year</option>
+                      <option value="4">4th Year</option>
+                      <option value="5">5th Year</option>
+                      <option value="master">Master&apos;s</option>
+                      <option value="phd">PhD</option>
+                    </select>
+                  </Field>
+                </div>
+              </Card>
+            )}
 
             {/* Step 1: Personal */}
             {step === 1 && (
@@ -482,7 +547,7 @@ export default function Page() {
 
             {/* Nav Buttons */}
             <div className="flex gap-3">
-              {step > 1 && (
+              {step > 0 && (
                 <button
                   onClick={() => setStep(s => s - 1)}
                   className="flex-1 rounded-xl border-2 border-slate-200 text-slate-600 font-semibold py-3 hover:border-slate-300 transition text-sm"
@@ -493,7 +558,8 @@ export default function Page() {
               {step < 4 ? (
                 <button
                   onClick={() => setStep(s => s + 1)}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 hover:shadow-lg hover:shadow-indigo-200 transition-all text-sm"
+                  disabled={step === 0 && (!firstName || !lastName)}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 hover:shadow-lg hover:shadow-indigo-200 transition-all text-sm disabled:opacity-50"
                 >
                   Continue →
                 </button>
@@ -519,8 +585,21 @@ export default function Page() {
         )}
 
         {/* ── RESULTS ────────────────────────────────────────────────── */}
-        {result && step === 5 && (
+        {result && step === 6 && (
           <div className="space-y-5 pb-12">
+
+            {/* Submission confirmation banner */}
+            <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-6 py-4 flex items-start gap-3">
+              <span className="text-2xl shrink-0">✅</span>
+              <div>
+                <p className="font-bold text-emerald-800 text-sm">Your application has been received!</p>
+                <p className="text-emerald-600 text-xs mt-0.5">
+                  {firstName && <span className="font-semibold">{firstName} {lastName}</span>}
+                  {firstName && " — "}
+                  Your evaluation has been completed and submitted to the scholarship committee.
+                </p>
+              </div>
+            </div>
 
             {/* Big Score Hero */}
             <div className={`rounded-3xl overflow-hidden shadow-lg bg-gradient-to-br ${scoreGradient}`}>
@@ -682,7 +761,7 @@ export default function Page() {
 
             {/* New Analysis */}
             <button
-              onClick={() => { setResult(null); setStep(1) }}
+              onClick={() => { setResult(null); setStep(0) }}
               className="w-full rounded-xl border-2 border-slate-200 text-slate-600 font-semibold py-3.5 hover:border-slate-300 transition text-sm"
             >
               ← New Analysis
