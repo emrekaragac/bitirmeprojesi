@@ -11,6 +11,7 @@ from backend.academic_scoring import compute_academic_score
 from backend.reporting import generate_report
 from backend.valuation import estimate_property_value, estimate_car_value
 from backend.ocr import parse_ruhsat, parse_tapu
+from backend.verification import validate_tc_no, scan_qr, cross_check
 from backend.db import init_db, save_application, get_all_applications, get_application
 from backend.scholarship_db import (
     init_scholarship_db,
@@ -270,6 +271,22 @@ async def scholarship_apply(
             "breakdown": all_breakdown,
         }
 
+    # ── Doğrulama ──
+    # TC Kimlik
+    tc_validation = validate_tc_no(tc_no)
+
+    # QR Kod tarama
+    qr_car   = scan_qr(saved_files["car_file"])   if "car_file"   in saved_files else None
+    qr_house = scan_qr(saved_files["house_file"])  if "house_file" in saved_files else None
+
+    # Cross-check
+    form_data_for_check = {
+        **form_data,
+        "estimated_car_value": estimated_car_value,
+        "property_estimated_value": property_estimated_value,
+    }
+    verification = cross_check(form_data_for_check, ruhsat_data, tapu_data)
+
     # PDF
     report_path = None
     try:
@@ -279,7 +296,7 @@ async def scholarship_apply(
     except Exception:
         pass
 
-    app_id = save_scholarship_application(sid, form_data, scores)
+    app_id = save_scholarship_application(sid, form_data, scores, verification)
 
     return {
         "application_id": app_id,
@@ -296,6 +313,18 @@ async def scholarship_apply(
         "estimated_car_value": estimated_car_value,
         "ruhsat_ocr": ruhsat_data,
         "tapu_ocr": tapu_data,
+        "verification": {
+            "tc_valid":       tc_validation.get("valid"),
+            "tc_error":       tc_validation.get("error"),
+            "qr_car":         qr_car,
+            "qr_house":       qr_house,
+            "trust_score":    verification.get("trust_score"),
+            "trust_level":    verification.get("trust_level"),
+            "needs_review":   verification.get("needs_review"),
+            "flags":          verification.get("flags"),
+            "notes":          verification.get("notes"),
+            "passed_checks":  verification.get("passed_checks"),
+        },
     }
 
 

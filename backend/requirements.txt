@@ -6,3 +6,5 @@ pandas
 pdfplumber
 pytesseract
 Pillow
+pyzbar
+pdf2image

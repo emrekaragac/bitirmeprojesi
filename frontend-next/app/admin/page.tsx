@@ -44,6 +44,27 @@ type App = {
   reasons: string[]
   breakdown: Record<string, number>
   form_data: Record<string, string | number | null>
+  needs_review?: boolean
+  trust_score?: number
+}
+
+type VerificationFlag = {
+  code: string
+  severity: "high" | "medium"
+  message: string
+}
+
+type Verification = {
+  tc_valid: boolean | null
+  tc_error: string | null
+  trust_score: number
+  trust_level: string
+  needs_review: boolean
+  flags: VerificationFlag[]
+  notes: string[]
+  passed_checks: string[]
+  qr_car?: { found: boolean; is_official: boolean; data?: string } | null
+  qr_house?: { found: boolean; is_official: boolean; data?: string } | null
 }
 
 type Detail = {
@@ -55,6 +76,7 @@ type Detail = {
   decision: string
   form_data: Record<string, string | number | null>
   scores: { reasons: string[]; breakdown: Record<string, number> }
+  verification?: Verification
 }
 
 const PRIORITY_STYLE: Record<string, string> = {
@@ -290,7 +312,7 @@ export default function AdminPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-100">
-                        {["#ID","Name","University","Date","Score","Priority","Decision","Gender","İşlem"].map(h => (
+                        {["#ID","Name","University","Date","Score","Priority","Decision","Gender","Trust","İşlem"].map(h => (
                           <th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -322,6 +344,14 @@ export default function AdminPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3 capitalize text-slate-700">{a.gender || "—"}</td>
+                          <td className="px-4 py-3">
+                            {a.needs_review
+                              ? <span className="text-xs bg-red-100 text-red-600 font-semibold px-2 py-0.5 rounded-full">⚠️ Review</span>
+                              : a.trust_score != null
+                              ? <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">✓ {a.trust_score}</span>
+                              : <span className="text-xs text-slate-400">—</span>
+                            }
+                          </td>
                           <td className="px-4 py-3">
                             <button
                               onClick={() => loadDetail(a.id)}
@@ -409,6 +439,99 @@ export default function AdminPage() {
                   ))}
                 </ul>
               </div>
+
+              {/* ── Verification Panel ── */}
+              {detail.verification && (
+                <div>
+                  <h3 className="font-bold text-slate-700 text-sm mb-3">🛡️ Document Verification</h3>
+
+                  {/* Trust score */}
+                  <div className={`rounded-xl px-4 py-3 mb-3 flex items-center justify-between
+                    ${(detail.verification.trust_score ?? 100) >= 80
+                      ? "bg-emerald-50 border border-emerald-200"
+                      : (detail.verification.trust_score ?? 100) >= 50
+                      ? "bg-amber-50 border border-amber-200"
+                      : "bg-red-50 border border-red-200"}`}>
+                    <div>
+                      <div className="text-xs font-semibold text-slate-600">Trust Score</div>
+                      <div className="text-xs text-slate-500">{detail.verification.trust_level}</div>
+                    </div>
+                    <div className={`text-2xl font-black
+                      ${(detail.verification.trust_score ?? 100) >= 80 ? "text-emerald-600"
+                        : (detail.verification.trust_score ?? 100) >= 50 ? "text-amber-600"
+                        : "text-red-600"}`}>
+                      {detail.verification.trust_score ?? "—"}
+                    </div>
+                  </div>
+
+                  {/* TC Kimlik */}
+                  <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg mb-2
+                    ${detail.verification.tc_valid ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                    <span>{detail.verification.tc_valid ? "✅" : "❌"}</span>
+                    <span className="font-semibold">TC Kimlik No:</span>
+                    <span>{detail.verification.tc_valid ? "Valid" : (detail.verification.tc_error || "Invalid")}</span>
+                  </div>
+
+                  {/* QR Codes */}
+                  {detail.verification.qr_car && (
+                    <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg mb-2
+                      ${detail.verification.qr_car.is_official ? "bg-emerald-50 text-emerald-700" : detail.verification.qr_car.found ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
+                      <span>{detail.verification.qr_car.is_official ? "✅" : detail.verification.qr_car.found ? "⚠️" : "—"}</span>
+                      <span className="font-semibold">Ruhsat QR:</span>
+                      <span>{detail.verification.qr_car.is_official ? "Official domain verified" : detail.verification.qr_car.found ? "QR found but domain unrecognized" : "No QR found"}</span>
+                    </div>
+                  )}
+                  {detail.verification.qr_house && (
+                    <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg mb-2
+                      ${detail.verification.qr_house.is_official ? "bg-emerald-50 text-emerald-700" : detail.verification.qr_house.found ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
+                      <span>{detail.verification.qr_house.is_official ? "✅" : detail.verification.qr_house.found ? "⚠️" : "—"}</span>
+                      <span className="font-semibold">Tapu QR:</span>
+                      <span>{detail.verification.qr_house.is_official ? "Official domain verified" : detail.verification.qr_house.found ? "QR found but domain unrecognized" : "No QR found"}</span>
+                    </div>
+                  )}
+
+                  {/* Flags */}
+                  {(detail.verification.flags || []).length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-xs font-semibold text-slate-500 mb-2">⚠️ Flags ({detail.verification.flags.length})</div>
+                      <div className="space-y-1.5">
+                        {detail.verification.flags.map((f, i) => (
+                          <div key={i} className={`text-xs px-3 py-2 rounded-lg flex gap-2
+                            ${f.severity === "high" ? "bg-red-50 text-red-700 border border-red-200" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
+                            <span className="shrink-0">{f.severity === "high" ? "🔴" : "🟡"}</span>
+                            <span>{f.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Passed checks */}
+                  {(detail.verification.passed_checks || []).length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-xs font-semibold text-slate-500 mb-2">✅ Passed ({detail.verification.passed_checks.length})</div>
+                      <div className="space-y-1">
+                        {detail.verification.passed_checks.map((p, i) => (
+                          <div key={i} className="text-xs text-emerald-700 flex gap-2">
+                            <span className="shrink-0">✓</span><span>{p}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  {(detail.verification.notes || []).length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {detail.verification.notes.map((n, i) => (
+                        <div key={i} className="text-xs text-slate-500 flex gap-2">
+                          <span className="shrink-0">ℹ️</span><span>{n}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <button
                 onClick={() => setDetail(null)}

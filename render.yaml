@@ -2,7 +2,7 @@ services:
   - type: web
     name: burs-dss-backend
     runtime: python
-    buildCommand: apt-get install -y tesseract-ocr tesseract-ocr-tur libgl1-mesa-glx --no-install-recommends || true && pip install -r backend/requirements.txt
+    buildCommand: apt-get install -y tesseract-ocr tesseract-ocr-tur libgl1-mesa-glx libzbar0 poppler-utils --no-install-recommends || true && pip install -r backend/requirements.txt
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: FRONTEND_URL

@@ -39,6 +39,9 @@ def init_scholarship_db():
             total_score     INTEGER NOT NULL,
             priority        TEXT NOT NULL,
             decision        TEXT NOT NULL,
+            verification    TEXT DEFAULT '{}',
+            trust_score     INTEGER DEFAULT NULL,
+            needs_review    INTEGER DEFAULT 0,
             FOREIGN KEY (scholarship_id) REFERENCES scholarships(id)
         )
     """)
@@ -111,12 +114,15 @@ def get_all_scholarships():
     return result
 
 
-def save_scholarship_application(scholarship_id: str, form_data: dict, scores: dict) -> int:
+def save_scholarship_application(scholarship_id: str, form_data: dict, scores: dict, verification: dict = None) -> int:
     conn = get_conn()
+    ver = verification or {}
+    trust_score  = ver.get("trust_score")
+    needs_review = 1 if ver.get("needs_review") else 0
     cur = conn.execute(
         """INSERT INTO scholarship_applications
-           (scholarship_id, submitted_at, form_data, scores, total_score, priority, decision)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+           (scholarship_id, submitted_at, form_data, scores, total_score, priority, decision, verification, trust_score, needs_review)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             scholarship_id,
             datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
@@ -125,6 +131,9 @@ def save_scholarship_application(scholarship_id: str, form_data: dict, scores: d
             scores.get("total_score", 0),
             scores.get("priority", ""),
             scores.get("decision", ""),
+            json.dumps(ver, ensure_ascii=False),
+            trust_score,
+            needs_review,
         ),
     )
     conn.commit()
@@ -158,6 +167,8 @@ def get_scholarship_applications(scholarship_id: str):
             "university": fd.get("university", ""),
             "department": fd.get("department", ""),
             "gender": fd.get("gender", ""),
+            "trust_score": r["trust_score"],
+            "needs_review": bool(r["needs_review"]),
             "reasons": sc.get("reasons", []),
             "breakdown": sc.get("breakdown", {}),
             "form_data": fd,
@@ -182,4 +193,7 @@ def get_scholarship_application(app_id: int):
         "decision": row["decision"],
         "form_data": json.loads(row["form_data"]),
         "scores": json.loads(row["scores"]),
+        "verification": json.loads(row["verification"] or "{}"),
+        "trust_score": row["trust_score"],
+        "needs_review": bool(row["needs_review"]),
     }
