@@ -69,9 +69,6 @@ const ACADEMIC_QUESTIONS: Question[] = [
 export default function SetupPage() {
   const router = useRouter()
   const [step, setStep] = useState(0)
-  const [adminKey, setAdminKey] = useState("")
-  const [keyErr, setKeyErr] = useState(false)
-  const [authed, setAuthed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [createdId, setCreatedId] = useState<string | null>(null)
 
@@ -122,7 +119,7 @@ export default function SetupPage() {
   async function handleCreate() {
     setLoading(true)
     try {
-      const res = await fetch(`${API}/scholarship/create?key=${adminKey}`, {
+      const res = await fetch(`${API}/scholarship/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -139,45 +136,15 @@ export default function SetupPage() {
           },
         }),
       })
-      if (!res.ok) { setKeyErr(true); setAuthed(false); setStep(0); return }
+      if (!res.ok) { alert("Could not create scholarship. Please try again."); return }
       const data = await res.json()
       setCreatedId(data.id)
     } catch {
-      alert("Connection error")
+      alert("Connection error — make sure the backend is running.")
     } finally {
       setLoading(false)
     }
   }
-
-  // ── Auth Screen ──
-  if (!authed) return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-indigo-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8">
-        <div className="text-center mb-6">
-          <div className="text-4xl mb-2">🔐</div>
-          <h1 className="text-2xl font-black text-slate-800">Scholarship Setup</h1>
-          <p className="text-slate-400 text-sm mt-1">Admin access required to create a scholarship</p>
-        </div>
-        <input
-          type="password"
-          placeholder="Admin key..."
-          value={adminKey}
-          onChange={e => setAdminKey(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && setAuthed(true)}
-          className={`w-full rounded-xl border-2 ${keyErr ? "border-red-400" : "border-slate-200"} px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400 text-sm mb-3`}
-        />
-        {keyErr && <p className="text-red-500 text-xs mb-3 text-center">Wrong key. Try again.</p>}
-        <button
-          onClick={() => { setKeyErr(false); setAuthed(true) }}
-          disabled={!adminKey}
-          className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 text-sm disabled:opacity-50"
-        >
-          Continue →
-        </button>
-        <a href="/" className="block text-center text-xs text-slate-400 mt-4 hover:text-slate-600">← Back to Home</a>
-      </div>
-    </div>
-  )
 
   // ── Success Screen ──
   if (createdId) return (

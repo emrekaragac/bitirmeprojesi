@@ -66,9 +66,7 @@ class ScholarshipCreateRequest(BaseModel):
 
 
 @app.post("/scholarship/create")
-def scholarship_create(body: ScholarshipCreateRequest, key: str = ""):
-    if key != ADMIN_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+def scholarship_create(body: ScholarshipCreateRequest):
     sid = create_scholarship(body.dict())
     return {"id": sid, "message": "Scholarship created"}
 
