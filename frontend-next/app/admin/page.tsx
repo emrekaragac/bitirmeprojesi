@@ -160,7 +160,7 @@ export default function AdminPage() {
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8">
         <div className="text-center mb-6">
           <div className="text-4xl mb-2">🔒</div>
-          <h1 className="text-2xl font-black text-slate-800">BursIQ Admin</h1>
+          <h1 className="text-2xl font-black text-slate-800">PSDS Admin</h1>
           <p className="text-slate-400 text-sm mt-1">Enter admin password to continue</p>
         </div>
         <input
@@ -189,7 +189,7 @@ export default function AdminPage() {
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-700 to-violet-700 text-white px-6 py-4 flex items-center gap-4 shadow">
         <div>
-          <h1 className="text-xl font-black">BursIQ Admin Panel</h1>
+          <h1 className="text-xl font-black">PSDS Admin Panel</h1>
           <p className="text-indigo-200 text-xs">{scholarships.length} scholarship(s) created</p>
         </div>
         <div className="ml-auto flex gap-3 items-center">

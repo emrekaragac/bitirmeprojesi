@@ -47,9 +47,9 @@ def generate_report(output_path: str, form_data: dict, scores: dict):
 
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 22)
-    c.drawString(40, H - 45, "BursIQ")
+    c.drawString(40, H - 45, "PSDS")
     c.setFont("Helvetica", 10)
-    c.drawString(40, H - 65, "Scholarship Intelligence System — Financial Need Report")
+    c.drawString(40, H - 65, "Parametric Scholarship Distribution System — Evaluation Report")
 
     c.setFont("Helvetica", 9)
     c.drawRightString(W - 40, H - 50, datetime.utcnow().strftime("%d %B %Y, %H:%M UTC"))
@@ -207,7 +207,7 @@ def generate_report(output_path: str, form_data: dict, scores: dict):
     # ── FOOTER ──────────────────────────────────────────────────────────────
     c.setFillColor(colors.HexColor("#94a3b8"))
     c.setFont("Helvetica", 8)
-    c.drawString(40, 30, "This report is generated automatically by BursIQ — Scholarship Intelligence System.")
+    c.drawString(40, 30, "This report is generated automatically by PSDS — Parametric Scholarship Distribution System.")
     c.drawRightString(W - 40, 30, f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
 
     c.save()

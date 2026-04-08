@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 
-function BursIQLogo({ size = 48 }: { size?: number }) {
+function PSSDLogo({ size = 48 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect width="48" height="48" rx="14" fill="url(#grad)" />
@@ -35,8 +35,8 @@ export default function LandingPage() {
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2">
-          <BursIQLogo size={36} />
-          <span className="text-white font-black text-xl tracking-tight">BursIQ</span>
+          <PSSDLogo size={36} />
+          <span className="text-white font-black text-xl tracking-tight">PSDS</span>
         </div>
         <a href="/admin" className="text-indigo-300 hover:text-white text-sm font-medium transition">
           Admin Panel →
@@ -46,16 +46,16 @@ export default function LandingPage() {
       {/* Hero */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 text-center">
         <div className="mb-6">
-          <BursIQLogo size={72} />
+          <PSSDLogo size={72} />
         </div>
         <h1 className="text-4xl sm:text-5xl font-black text-white mb-3 leading-tight">
-          Smart Scholarship<br />
+          Parametric Scholarship<br />
           <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-            Decision System
+            Distribution System
           </span>
         </h1>
         <p className="text-slate-400 text-lg max-w-md mb-12">
-          AI-powered scholarship evaluation with automatic scoring, document OCR, and financial analysis.
+          Configure your own criteria, collect applications, and automatically score candidates — all in one platform.
         </p>
 
         {/* Two paths */}
@@ -124,7 +124,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <div className="text-center py-4 text-slate-600 text-xs">
-        BursIQ © 2024 — Scholarship Decision Support System
+        PSDS © 2024 — Parametric Scholarship Distribution System
       </div>
     </div>
   )

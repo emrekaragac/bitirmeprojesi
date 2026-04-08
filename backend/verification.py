@@ -1,5 +1,5 @@
 """
-BursIQ — Belge Doğrulama Modülü
+PSDS — Belge Doğrulama Modülü
 1. TC Kimlik No mod-11 doğrulama
 2. QR Kod okuma (pyzbar)
 3. Form vs OCR cross-check + güven skoru

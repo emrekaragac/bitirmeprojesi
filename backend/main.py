@@ -23,7 +23,7 @@ from backend.scholarship_db import (
     get_scholarship_application,
 )
 
-app = FastAPI(title="BursIQ API")
+app = FastAPI(title="PSDS API — Parametric Scholarship Distribution System")
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,7 +47,7 @@ def startup():
 
 @app.get("/")
 def root():
-    return {"message": "BursIQ API calisiyor", "version": "3.0"}
+    return {"message": "PSDS API running", "version": "3.0"}
 
 
 # ─────────────────────────────────────────────────────────────
