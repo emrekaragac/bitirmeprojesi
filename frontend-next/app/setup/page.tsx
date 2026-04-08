@@ -136,11 +136,15 @@ export default function SetupPage() {
           },
         }),
       })
-      if (!res.ok) { alert("Could not create scholarship. Please try again."); return }
+      if (!res.ok) {
+        const errText = await res.text()
+        alert(`Error ${res.status}: ${errText}`)
+        return
+      }
       const data = await res.json()
       setCreatedId(data.id)
-    } catch {
-      alert("Connection error — make sure the backend is running.")
+    } catch (e) {
+      alert(`Connection error: ${e}\n\nAPI URL: ${API}`)
     } finally {
       setLoading(false)
     }
