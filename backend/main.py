@@ -73,6 +73,27 @@ def scholarship_create(body: ScholarshipCreateRequest, key: str = ""):
     return {"id": sid, "message": "Scholarship created"}
 
 
+@app.get("/scholarships")
+def scholarships_list():
+    """Public endpoint — returns all scholarships (no admin key needed)"""
+    all_s = get_all_scholarships()
+    # Strip internal config details, return only what applicants need to see
+    return [
+        {
+            "id": s["id"],
+            "name": s["name"],
+            "description": s["description"],
+            "slots": s["slots"],
+            "deadline": s["deadline"],
+            "type": s["type"],
+            "financial_weight": s["financial_weight"],
+            "academic_weight": s["academic_weight"],
+            "created_at": s["created_at"],
+        }
+        for s in all_s
+    ]
+
+
 @app.get("/scholarship/{sid}")
 def scholarship_get(sid: str):
     s = get_scholarship(sid)

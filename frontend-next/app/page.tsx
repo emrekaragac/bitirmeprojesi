@@ -1,7 +1,27 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:9001"
+
+type Scholarship = {
+  id: string
+  name: string
+  description: string
+  slots: number
+  deadline: string
+  type: "financial" | "academic" | "both"
+  financial_weight: number
+  academic_weight: number
+  created_at: string
+}
+
+const TYPE_BADGE: Record<string, { label: string; color: string }> = {
+  financial: { label: "💸 Financial",         color: "bg-blue-100 text-blue-700" },
+  academic:  { label: "🎓 Academic",          color: "bg-violet-100 text-violet-700" },
+  both:      { label: "⚖️ Financial + Academic", color: "bg-indigo-100 text-indigo-700" },
+}
 
 function PSSDLogo({ size = 48 }: { size?: number }) {
   return (
@@ -20,110 +40,189 @@ function PSSDLogo({ size = 48 }: { size?: number }) {
   )
 }
 
+function DeadlineBadge({ deadline }: { deadline: string }) {
+  if (!deadline) return null
+  const days = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000)
+  if (days < 0) return <span className="text-xs text-red-500 font-semibold">Closed</span>
+  if (days <= 7) return <span className="text-xs text-orange-500 font-semibold">⏰ {days}d left</span>
+  return <span className="text-xs text-slate-400">{deadline}</span>
+}
+
 export default function LandingPage() {
   const router = useRouter()
-  const [scholarshipId, setScholarshipId] = useState("")
-  const [idErr, setIdErr] = useState(false)
+  const [scholarships, setScholarships] = useState<Scholarship[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [filter, setFilter] = useState<"all" | "financial" | "academic" | "both">("all")
 
-  function handleApply() {
-    if (!scholarshipId.trim()) { setIdErr(true); return }
-    router.push(`/apply/${scholarshipId.trim().toUpperCase()}`)
-  }
+  useEffect(() => {
+    fetch(`${API}/scholarships`)
+      .then(r => r.json())
+      .then(data => setScholarships(Array.isArray(data) ? data : []))
+      .catch(() => setScholarships([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const filtered = scholarships.filter(s => {
+    const matchSearch = !search ||
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.description.toLowerCase().includes(search.toLowerCase())
+    const matchFilter = filter === "all" || s.type === filter
+    return matchSearch && matchFilter
+  })
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex flex-col">
-      {/* Top bar */}
+
+      {/* ── Top Bar ── */}
       <div className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <PSSDLogo size={36} />
-          <span className="text-white font-black text-xl tracking-tight">PSDS</span>
+          <div>
+            <span className="text-white font-black text-lg tracking-tight leading-none block">PSDS</span>
+            <span className="text-indigo-300 text-[10px] leading-none hidden sm:block">Parametric Scholarship Distribution System</span>
+          </div>
         </div>
-        <a href="/admin" className="text-indigo-300 hover:text-white text-sm font-medium transition">
-          Admin Panel →
-        </a>
+        <div className="flex items-center gap-3">
+          <a href="/setup" className="text-xs bg-white/10 hover:bg-white/20 transition text-white px-3 py-1.5 rounded-lg font-semibold border border-white/10">
+            + Create Scholarship
+          </a>
+          <a href="/admin" className="text-xs text-indigo-300 hover:text-white transition font-medium">
+            Admin →
+          </a>
+        </div>
       </div>
 
-      {/* Hero */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 text-center">
-        <div className="mb-6">
-          <PSSDLogo size={72} />
-        </div>
-        <h1 className="text-4xl sm:text-5xl font-black text-white mb-3 leading-tight">
-          Parametric Scholarship<br />
+      {/* ── Hero ── */}
+      <div className="text-center px-4 pt-6 pb-8">
+        <h1 className="text-3xl sm:text-4xl font-black text-white mb-2 leading-tight">
+          Find Your{" "}
           <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-            Distribution System
+            Scholarship
           </span>
         </h1>
-        <p className="text-slate-400 text-lg max-w-md mb-12">
-          Configure your own criteria, collect applications, and automatically score candidates — all in one platform.
+        <p className="text-slate-400 text-sm max-w-md mx-auto">
+          Browse open scholarships and apply directly. Each scholarship has its own criteria and scoring system.
         </p>
+      </div>
 
-        {/* Two paths */}
-        <div className="grid sm:grid-cols-2 gap-5 w-full max-w-2xl">
-
-          {/* Provider Card */}
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 flex flex-col items-center text-center hover:bg-white/10 transition group">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition">
-              🏛️
-            </div>
-            <h2 className="text-white font-black text-lg mb-2">I'm a Scholarship Provider</h2>
-            <p className="text-slate-400 text-sm mb-5">
-              Create a custom scholarship with your own criteria, documents, and scoring weights.
-            </p>
-            <a
-              href="/setup"
-              className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold py-3 text-sm hover:shadow-lg hover:shadow-indigo-900/50 transition block text-center"
-            >
-              Create Scholarship →
-            </a>
-          </div>
-
-          {/* Applicant Card */}
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 flex flex-col items-center text-center hover:bg-white/10 transition group">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition">
-              🎓
-            </div>
-            <h2 className="text-white font-black text-lg mb-2">I'm an Applicant</h2>
-            <p className="text-slate-400 text-sm mb-4">
-              Enter your scholarship ID to start your application. Get instant results.
-            </p>
-            <div className="w-full space-y-2">
-              <input
-                value={scholarshipId}
-                onChange={e => { setScholarshipId(e.target.value.toUpperCase()); setIdErr(false) }}
-                onKeyDown={e => e.key === "Enter" && handleApply()}
-                placeholder="Scholarship ID (e.g. A1B2C3)"
-                className={`w-full rounded-xl border-2 ${idErr ? "border-red-500" : "border-white/20"} bg-white/10 text-white placeholder-slate-400 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-400`}
-              />
-              {idErr && <p className="text-red-400 text-xs">Please enter a scholarship ID</p>}
+      {/* ── Search + Filter ── */}
+      <div className="max-w-3xl mx-auto w-full px-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search scholarships…"
+            className="flex-1 rounded-xl bg-white/10 border border-white/10 text-white placeholder-slate-400 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400"
+          />
+          <div className="flex gap-2">
+            {(["all","financial","academic","both"] as const).map(f => (
               <button
-                onClick={handleApply}
-                className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-3 text-sm hover:shadow-lg hover:shadow-emerald-900/50 transition"
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold transition capitalize ${
+                  filter === f
+                    ? "bg-indigo-500 text-white"
+                    : "bg-white/10 text-slate-300 hover:bg-white/20 border border-white/10"
+                }`}
               >
-                Apply Now →
+                {f === "all" ? "All" : f === "both" ? "Both" : f}
               </button>
-            </div>
+            ))}
           </div>
-        </div>
-
-        {/* Features */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-2xl mt-10">
-          {[
-            { icon: "🤖", label: "AI Scoring" },
-            { icon: "📄", label: "OCR Documents" },
-            { icon: "📊", label: "Real-time Results" },
-            { icon: "🔒", label: "Secure & Private" },
-          ].map(f => (
-            <div key={f.label} className="bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-center">
-              <div className="text-xl mb-1">{f.icon}</div>
-              <div className="text-slate-400 text-xs font-medium">{f.label}</div>
-            </div>
-          ))}
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="text-center py-4 text-slate-600 text-xs">
+      {/* ── Scholarship List ── */}
+      <div className="max-w-3xl mx-auto w-full px-4 flex-1">
+        {loading ? (
+          <div className="text-center py-20">
+            <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">Loading scholarships…</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-4xl mb-3">{scholarships.length === 0 ? "📭" : "🔍"}</div>
+            {scholarships.length === 0 ? (
+              <>
+                <p className="text-slate-400 text-sm mb-2">No scholarships available yet.</p>
+                <a href="/setup" className="text-indigo-400 hover:text-indigo-300 text-sm font-semibold underline">
+                  Create the first one →
+                </a>
+              </>
+            ) : (
+              <p className="text-slate-400 text-sm">No scholarships match your search.</p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3 pb-12">
+            {/* Count */}
+            <p className="text-slate-400 text-xs px-1">{filtered.length} scholarship{filtered.length !== 1 ? "s" : ""} available</p>
+
+            {filtered.map(s => {
+              const badge = TYPE_BADGE[s.type] || { label: s.type, color: "bg-slate-100 text-slate-600" }
+              const isClosed = s.deadline && new Date(s.deadline) < new Date()
+              return (
+                <div
+                  key={s.id}
+                  className={`bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition cursor-pointer group ${isClosed ? "opacity-60" : ""}`}
+                  onClick={() => !isClosed && router.push(`/apply/${s.id}`)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.color}`}>
+                          {badge.label}
+                        </span>
+                        {s.type === "both" && (
+                          <span className="text-xs text-slate-400">
+                            {s.financial_weight}% Financial · {s.academic_weight}% Academic
+                          </span>
+                        )}
+                        {isClosed && (
+                          <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-semibold">
+                            Closed
+                          </span>
+                        )}
+                      </div>
+                      <h2 className="text-white font-black text-lg group-hover:text-indigo-300 transition leading-tight">
+                        {s.name}
+                      </h2>
+                      {s.description && (
+                        <p className="text-slate-400 text-sm mt-1 line-clamp-2">{s.description}</p>
+                      )}
+                      <div className="flex items-center gap-4 mt-3">
+                        {s.slots > 0 && (
+                          <span className="text-xs text-slate-400 flex items-center gap-1">
+                            <span>👥</span> {s.slots} slots
+                          </span>
+                        )}
+                        {s.deadline && (
+                          <span className="text-xs text-slate-400 flex items-center gap-1">
+                            <span>📅</span> <DeadlineBadge deadline={s.deadline} />
+                          </span>
+                        )}
+                        <span className="text-xs font-mono text-slate-500">#{s.id}</span>
+                      </div>
+                    </div>
+
+                    {!isClosed && (
+                      <div className="shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-500/20 group-hover:bg-indigo-500/40 transition flex items-center justify-center text-indigo-300 text-lg">
+                          →
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Footer ── */}
+      <div className="text-center py-4 text-slate-600 text-xs border-t border-white/5">
         PSDS © 2024 — Parametric Scholarship Distribution System
       </div>
     </div>

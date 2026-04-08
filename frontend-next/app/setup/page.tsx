@@ -139,7 +139,7 @@ export default function SetupPage() {
           },
         }),
       })
-      if (!res.ok) { setKeyErr(true); setStep(0); return }
+      if (!res.ok) { setKeyErr(true); setAuthed(false); setStep(0); return }
       const data = await res.json()
       setCreatedId(data.id)
     } catch {
