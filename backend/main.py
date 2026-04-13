@@ -1,5 +1,6 @@
 import os
 import json
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -24,7 +25,20 @@ from backend.scholarship_db import (
     get_scholarship_application,
 )
 
-app = FastAPI(title="PSDS API — Parametric Scholarship Distribution System")
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("reports", exist_ok=True)
+
+ADMIN_KEY = os.getenv("ADMIN_KEY", "bursiq2024")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    init_scholarship_db()
+    yield
+
+
+app = FastAPI(title="PSDS API — Parametric Scholarship Distribution System", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,17 +47,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-os.makedirs("uploads", exist_ok=True)
-os.makedirs("reports", exist_ok=True)
-
-ADMIN_KEY = os.getenv("ADMIN_KEY", "bursiq2024")
-
-
-@app.on_event("startup")
-def startup():
-    init_db()
-    init_scholarship_db()
 
 
 @app.get("/")
