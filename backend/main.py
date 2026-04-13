@@ -8,6 +8,7 @@ from typing import Optional, Any
 
 from backend.scoring import compute_scores
 from backend.academic_scoring import compute_academic_score
+from backend.parametric_scoring import compute_parametric_score
 from backend.reporting import generate_report
 from backend.valuation import estimate_property_value, estimate_car_value
 from backend.ocr import parse_ruhsat, parse_tapu
@@ -260,35 +261,40 @@ async def scholarship_apply(
         **extra,
     }
 
-    # Compute combined score based on scholarship type
+    # Compute score — parametric if weights configured, else legacy
     scholarship_type = s.get("type", "financial")
-    fin_w = s.get("financial_weight", 100) / 100
-    aca_w = s.get("academic_weight", 0) / 100
+    config_questions  = s.get("config", {}).get("questions", [])
+    has_weights = any(q.get("weight", 0) > 0 for q in config_questions)
 
-    if scholarship_type == "financial":
-        scores = compute_scores(form_data)
-    elif scholarship_type == "academic":
-        scores = compute_academic_score(form_data)
-    else:  # both
-        fin_scores = compute_scores(form_data)
-        aca_scores = compute_academic_score(form_data)
-        combined = round(fin_scores["total_score"] * fin_w + aca_scores["total_score"] * aca_w)
-        combined = max(0, min(combined, 100))
-        all_reasons = fin_scores["reasons"] + aca_scores["reasons"]
-        all_breakdown = {**fin_scores["breakdown"], **aca_scores["breakdown"]}
-        if combined >= 75:
-            priority, decision = "High Priority", "Accepted"
-        elif combined >= 50:
-            priority, decision = "Medium Priority", "Under Review"
+    if has_weights:
+        # Fully parametric: use provider-defined weights and answer scores
+        scores = compute_parametric_score(form_data, config_questions)
+    else:
+        # Legacy fallback
+        fin_w = s.get("financial_weight", 100) / 100
+        aca_w = s.get("academic_weight", 0) / 100
+        if scholarship_type == "financial":
+            scores = compute_scores(form_data)
+        elif scholarship_type == "academic":
+            scores = compute_academic_score(form_data)
         else:
-            priority, decision = "Low Priority", "Rejected"
-        scores = {
-            "total_score": combined,
-            "priority": priority,
-            "decision": decision,
-            "reasons": all_reasons,
-            "breakdown": all_breakdown,
-        }
+            fin_scores = compute_scores(form_data)
+            aca_scores = compute_academic_score(form_data)
+            combined = round(fin_scores["total_score"] * fin_w + aca_scores["total_score"] * aca_w)
+            combined = max(0, min(combined, 100))
+            if combined >= 75:
+                priority, decision = "High Priority", "Accepted"
+            elif combined >= 50:
+                priority, decision = "Medium Priority", "Under Review"
+            else:
+                priority, decision = "Low Priority", "Rejected"
+            scores = {
+                "total_score": combined,
+                "priority": priority,
+                "decision": decision,
+                "reasons": fin_scores["reasons"] + aca_scores["reasons"],
+                "breakdown": {**fin_scores["breakdown"], **aca_scores["breakdown"]},
+            }
 
     # ── Doğrulama ──
     # TC Kimlik
