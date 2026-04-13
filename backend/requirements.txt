@@ -6,3 +6,4 @@ pandas
 pdfplumber
 pytesseract
 Pillow
+anthropic

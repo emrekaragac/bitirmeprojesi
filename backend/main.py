@@ -10,7 +10,7 @@ from backend.scoring import compute_scores
 from backend.academic_scoring import compute_academic_score
 from backend.parametric_scoring import compute_parametric_score
 from backend.reporting import generate_report
-from backend.valuation import estimate_property_value, estimate_car_value
+from backend.rag_valuation import rag_estimate_property, rag_estimate_car
 from backend.ocr import parse_ruhsat, parse_tapu
 from backend.verification import validate_tc_no, scan_qr, cross_check
 from backend.db import init_db, save_application, get_all_applications, get_application
@@ -213,21 +213,33 @@ async def scholarship_apply(
 
     # Valuations
     estimated_car_value = None
+    car_rag_used = False
+    car_confidence = None
+    car_reasoning = None
     if has_car == "yes" and car_brand and car_year:
         try:
-            res = estimate_car_value(marka=car_brand, model=car_model,
-                                     yil=int(car_year), has_damage=(car_damage == "yes"))
+            res = rag_estimate_car(brand=car_brand, model=car_model,
+                                   year=int(car_year), has_damage=(car_damage == "yes"))
             estimated_car_value = res.get("estimated_car_value")
+            car_rag_used = res.get("rag_used", False)
+            car_confidence = res.get("confidence")
+            car_reasoning = res.get("reasoning")
         except Exception:
             pass
 
     property_estimated_value = None
     avg_m2_price = None
+    property_rag_used = False
+    property_confidence = None
+    property_reasoning = None
     if has_house == "yes" and city and square_meters:
         try:
-            val = estimate_property_value(city=city, district=district, square_meters=float(square_meters))
+            val = rag_estimate_property(city=city, district=district, square_meters=float(square_meters))
             property_estimated_value = val.get("property_estimated_value")
             avg_m2_price = val.get("avg_m2_price")
+            property_rag_used = val.get("rag_used", False)
+            property_confidence = val.get("confidence")
+            property_reasoning = val.get("reasoning")
         except Exception:
             pass
 
@@ -251,10 +263,12 @@ async def scholarship_apply(
         "has_car": has_car, "car_brand": car_brand, "car_model": car_model,
         "car_year": car_year, "car_damage": car_damage,
         "estimated_car_value": estimated_car_value,
+        "car_rag_used": car_rag_used, "car_confidence": car_confidence, "car_reasoning": car_reasoning,
         "has_house": has_house, "city": city, "district": district,
         "square_meters": square_meters,
         "property_estimated_value": property_estimated_value,
         "avg_m2_price": avg_m2_price,
+        "property_rag_used": property_rag_used, "property_confidence": property_confidence, "property_reasoning": property_reasoning,
         "gpa": gpa, "gpa_system": gpa_system,
         "has_research": has_research, "has_award": has_award,
         "language_level": language_level, "has_activity": has_activity,
@@ -430,21 +444,33 @@ async def analyze(
             pass
 
     estimated_car_value = None
+    car_rag_used = False
+    car_confidence = None
+    car_reasoning = None
     if has_car == "yes" and car_brand and car_year:
         try:
-            res = estimate_car_value(marka=car_brand, model=car_model,
-                                     yil=int(car_year), has_damage=(car_damage == "yes"))
+            res = rag_estimate_car(brand=car_brand, model=car_model,
+                                   year=int(car_year), has_damage=(car_damage == "yes"))
             estimated_car_value = res.get("estimated_car_value")
+            car_rag_used = res.get("rag_used", False)
+            car_confidence = res.get("confidence")
+            car_reasoning = res.get("reasoning")
         except Exception:
             pass
 
     property_estimated_value = None
     avg_m2_price = None
+    property_rag_used = False
+    property_confidence = None
+    property_reasoning = None
     if has_house == "yes" and city and square_meters:
         try:
-            val = estimate_property_value(city=city, district=district, square_meters=float(square_meters))
+            val = rag_estimate_property(city=city, district=district, square_meters=float(square_meters))
             property_estimated_value = val.get("property_estimated_value")
             avg_m2_price = val.get("avg_m2_price")
+            property_rag_used = val.get("rag_used", False)
+            property_confidence = val.get("confidence")
+            property_reasoning = val.get("reasoning")
         except Exception:
             pass
 
@@ -461,10 +487,12 @@ async def analyze(
         "has_car": has_car, "car_brand": car_brand, "car_model": car_model,
         "car_year": car_year, "car_damage": car_damage, "car_owner": car_owner,
         "estimated_car_value": estimated_car_value,
+        "car_rag_used": car_rag_used, "car_confidence": car_confidence, "car_reasoning": car_reasoning,
         "has_house": has_house, "city": city, "district": district,
         "square_meters": square_meters,
         "property_estimated_value": property_estimated_value,
         "avg_m2_price": avg_m2_price,
+        "property_rag_used": property_rag_used, "property_confidence": property_confidence, "property_reasoning": property_reasoning,
     }
 
     scores = compute_scores(form_data)
