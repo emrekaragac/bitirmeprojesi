@@ -54,12 +54,13 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<"all" | "financial" | "academic" | "both">("all")
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`${API}/scholarships`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then(data => setScholarships(Array.isArray(data) ? data : []))
-      .catch(() => setScholarships([]))
+      .catch(e => { setScholarships([]); setFetchError(String(e)) })
       .finally(() => setLoading(false))
   }, [])
 
@@ -139,6 +140,13 @@ export default function LandingPage() {
           <div className="text-center py-20">
             <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             <p className="text-slate-400 text-sm">Loading scholarships…</p>
+          </div>
+        ) : fetchError ? (
+          <div className="text-center py-20">
+            <div className="text-4xl mb-3">⚠️</div>
+            <p className="text-red-400 text-sm mb-1">Could not reach the backend.</p>
+            <p className="text-slate-500 text-xs font-mono mb-1">API: {API}</p>
+            <p className="text-slate-600 text-xs">{fetchError}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20">
