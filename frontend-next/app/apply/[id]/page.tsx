@@ -17,7 +17,6 @@ type Scholarship = {
   id: string
   name: string
   description: string
-  slots: number
   deadline: string
   type: "financial" | "academic" | "both"
   financial_weight: number
@@ -241,7 +240,6 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
           {s.description && <p className="text-indigo-200 text-sm mt-0.5">{s.description}</p>}
           <div className="flex gap-3 mt-2">
             <span className="bg-white/20 text-xs px-2 py-0.5 rounded-full capitalize">{s.type === "both" ? `${s.financial_weight}% Financial · ${s.academic_weight}% Academic` : s.type}</span>
-            {s.slots > 0 && <span className="bg-white/20 text-xs px-2 py-0.5 rounded-full">{s.slots} slots</span>}
           </div>
         </div>
       </div>

@@ -23,7 +23,6 @@ type Question = {
 type ScholarshipConfig = {
   name: string
   description: string
-  slots: number
   deadline: string
   type: "financial" | "academic" | "both"
   financial_weight: number
@@ -94,7 +93,6 @@ export default function SetupPage() {
   const [config, setConfig] = useState<ScholarshipConfig>({
     name: "",
     description: "",
-    slots: 10,
     deadline: "",
     type: "financial",
     financial_weight: 100,
@@ -218,7 +216,7 @@ export default function SetupPage() {
           </a>
         </div>
         <button
-          onClick={() => { setCreatedId(null); setStep(0); setConfig({ name:"",description:"",slots:10,deadline:"",type:"financial",financial_weight:100,academic_weight:0,documents:[],questions:[] }) }}
+          onClick={() => { setCreatedId(null); setStep(0); setConfig({ name:"",description:"",deadline:"",type:"financial",financial_weight:100,academic_weight:0,documents:[],questions:[] }) }}
           className="mt-3 text-xs text-slate-400 hover:text-slate-600"
         >
           Create another scholarship
@@ -291,16 +289,7 @@ export default function SetupPage() {
                   className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Number of Slots</label>
-                  <input
-                    type="number"
-                    value={config.slots}
-                    onChange={e => set("slots", Number(e.target.value))}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400"
-                  />
-                </div>
+              <div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Deadline</label>
                   <input
@@ -310,7 +299,7 @@ export default function SetupPage() {
                     className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400"
                   />
                 </div>
-              </div>
+
             </div>
 
             {/* Scholarship type */}
@@ -588,10 +577,6 @@ export default function SetupPage() {
                   <span className="text-sm font-semibold text-slate-700">💸 {config.financial_weight}% · 🎓 {config.academic_weight}%</span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-sm text-slate-500">Slots</span>
-                <span className="text-sm font-semibold text-slate-800">{config.slots}</span>
-              </div>
               {config.deadline && (
                 <div className="flex justify-between">
                   <span className="text-sm text-slate-500">Deadline</span>

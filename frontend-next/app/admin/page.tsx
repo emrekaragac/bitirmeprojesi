@@ -21,7 +21,6 @@ type Scholarship = {
   id: string
   name: string
   description: string
-  slots: number
   deadline: string
   type: string
   financial_weight: number
@@ -228,7 +227,6 @@ export default function AdminPage() {
                     <h3 className="font-black text-slate-800 text-base mb-1 group-hover:text-indigo-700 transition">{s.name}</h3>
                     {s.description && <p className="text-slate-500 text-xs mb-3 line-clamp-2">{s.description}</p>}
                     <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span>{s.slots > 0 ? `${s.slots} slots` : "Unlimited"}</span>
                       <span>{s.deadline || "No deadline"}</span>
                     </div>
                     <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">

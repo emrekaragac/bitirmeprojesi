@@ -9,7 +9,6 @@ type Scholarship = {
   id: string
   name: string
   description: string
-  slots: number
   deadline: string
   type: "financial" | "academic" | "both"
   financial_weight: number
@@ -200,11 +199,6 @@ export default function LandingPage() {
                         <p className="text-slate-400 text-sm mt-1 line-clamp-2">{s.description}</p>
                       )}
                       <div className="flex items-center gap-4 mt-3">
-                        {s.slots > 0 && (
-                          <span className="text-xs text-slate-400 flex items-center gap-1">
-                            <span>👥</span> {s.slots} slots
-                          </span>
-                        )}
                         {s.deadline && (
                           <span className="text-xs text-slate-400 flex items-center gap-1">
                             <span>📅</span> <DeadlineBadge deadline={s.deadline} />

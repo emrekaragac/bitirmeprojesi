@@ -61,7 +61,6 @@ def root():
 class ScholarshipCreateRequest(BaseModel):
     name: str
     description: str = ""
-    slots: int = 0
     deadline: str = ""
     type: str = "financial"          # financial | academic | both
     financial_weight: int = 100
