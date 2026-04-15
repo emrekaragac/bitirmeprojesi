@@ -163,7 +163,6 @@ export default function SetupPage() {
         body: JSON.stringify({
           name: config.name,
           description: config.description,
-          slots: config.slots,
           deadline: config.deadline,
           type: config.type,
           financial_weight: config.financial_weight,
