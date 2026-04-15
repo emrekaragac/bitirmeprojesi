@@ -118,10 +118,6 @@ const LEADERSHIP_QUESTIONS: QTemplate[] = [
   { id: "has_startup",         label: "Active business venture? (sole proprietorship, startup…)", type: "yesno", required: false, source: "TÜBİTAK Ekosistemi / Fulbright" },
 ]
 
-const CAREER_QUESTIONS: QTemplate[] = [
-  { id: "career_field",       label: "Target career field",                          type: "select", options: ["academia","public_sector","private_sector","ngo","entrepreneurship"], required: false, source: "Fulbright / YTB / Commonwealth" },
-  { id: "post_grad_location", label: "Where plan to work after graduation?",         type: "select", options: ["same_city","diff_city","abroad","undecided"], required: false, source: "YTB / Commonwealth — Beyin Göçü Riski" },
-]
 
 // ── Ana Component ────────────────────────────────────────────
 export default function SetupPage() {
@@ -283,7 +279,6 @@ export default function SetupPage() {
     ...(showFinancial ? [{ title: "💸 Financial Questions", emoji: "💸", items: FINANCIAL_QUESTIONS }] : []),
     ...(showAcademic  ? [{ title: "🎓 Academic Questions",  emoji: "🎓", items: ACADEMIC_QUESTIONS  }] : []),
     { title: "🏆 Leadership & Social Impact", emoji: "🏆", items: LEADERSHIP_QUESTIONS },
-    { title: "🎯 Career & Goals",             emoji: "🎯", items: CAREER_QUESTIONS },
   ]
 
   return (
