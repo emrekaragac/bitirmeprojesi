@@ -4,7 +4,7 @@ import os
 import uuid
 from datetime import datetime
 
-DB_PATH = os.getenv("DB_PATH", "bursiq.db")
+DB_PATH = os.getenv("DB_PATH", "psds.db")
 
 
 def get_conn():

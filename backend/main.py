@@ -28,7 +28,7 @@ from backend.scholarship_db import (
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("reports", exist_ok=True)
 
-ADMIN_KEY = os.getenv("ADMIN_KEY", "bursiq2024")
+ADMIN_KEY = os.getenv("ADMIN_KEY", "psds2024")
 
 
 @asynccontextmanager
