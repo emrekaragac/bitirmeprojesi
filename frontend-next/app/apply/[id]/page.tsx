@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect, useCallback, use } from "react"
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://bitirmeprojesi-gza2.onrender.com"
 
@@ -99,6 +99,31 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
   const [files, setFiles]   = useState<Record<string, File>>({})
   const [loading, setLoading] = useState(false)
   const [result, setResult]  = useState<Result | null>(null)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+
+  const DRAFT_KEY = `psds_draft_${id}`
+
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const draft = JSON.parse(raw)
+        if (draft.values) setValues(draft.values)
+        if (typeof draft.step === "number" && draft.step < 3) setStep(draft.step)
+        setSavedAt(draft.savedAt || null)
+      }
+    } catch {}
+  }, [DRAFT_KEY])
+
+  // Auto-save values + step to localStorage whenever they change
+  const saveDraft = useCallback((vals: Record<string, string>, currentStep: number) => {
+    try {
+      const now = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ values: vals, step: currentStep, savedAt: now }))
+      setSavedAt(now)
+    } catch {}
+  }, [DRAFT_KEY])
 
   useEffect(() => {
     fetch(`${API}/scholarship/${id}`)
@@ -108,7 +133,16 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
   }, [id])
 
   function setVal(key: string, val: string) {
-    setValues(prev => ({ ...prev, [key]: val }))
+    setValues(prev => {
+      const next = { ...prev, [key]: val }
+      saveDraft(next, step)
+      return next
+    })
+  }
+
+  function goStep(s: number) {
+    setStep(s)
+    saveDraft(values, s)
   }
 
   function setFile(key: string, f: File | null) {
@@ -147,6 +181,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       const data = await res.json()
       setResult(data)
       setStep(3)
+      // Clear draft after successful submission
+      try { localStorage.removeItem(DRAFT_KEY) } catch {}
     } catch (e) {
       alert("Submission error: " + e)
     } finally {
@@ -192,7 +228,14 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-1">
             <a href="/" className="text-indigo-200 hover:text-white text-sm">← Home</a>
-            {s.deadline && <span className="text-indigo-200 text-xs">Deadline: {s.deadline}</span>}
+            <div className="flex items-center gap-3">
+              {savedAt && (
+                <span className="text-indigo-300 text-xs flex items-center gap-1">
+                  <span>💾</span> Draft saved {savedAt}
+                </span>
+              )}
+              {s.deadline && <span className="text-indigo-200 text-xs">Deadline: {s.deadline}</span>}
+            </div>
           </div>
           <h1 className="text-xl font-black">{s.name}</h1>
           {s.description && <p className="text-indigo-200 text-sm mt-0.5">{s.description}</p>}
@@ -278,7 +321,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             </div>
 
             <button
-              onClick={() => setStep(1)}
+              onClick={() => goStep(1)}
               disabled={!values.first_name || !values.last_name}
               className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 disabled:opacity-50"
             >
@@ -387,8 +430,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setStep(0)} className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm">← Back</button>
-              <button onClick={() => setStep(2)} className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 text-sm">
+              <button onClick={() => goStep(0)} className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm">← Back</button>
+              <button onClick={() => goStep(2)} className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 text-sm">
                 Next: Documents →
               </button>
             </div>
@@ -432,7 +475,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setStep(1)} className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm">← Back</button>
+              <button onClick={() => goStep(1)} className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm">← Back</button>
               <button
                 onClick={handleSubmit}
                 disabled={loading}
