@@ -290,16 +290,14 @@ export default function SetupPage() {
                 />
               </div>
               <div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Deadline</label>
-                  <input
-                    type="date"
-                    value={config.deadline}
-                    onChange={e => set("deadline", e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400"
-                  />
-                </div>
-
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Deadline</label>
+                <input
+                  type="date"
+                  value={config.deadline}
+                  onChange={e => set("deadline", e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+              </div>
             </div>
 
             {/* Scholarship type */}
