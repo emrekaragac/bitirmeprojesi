@@ -12,7 +12,6 @@ from typing import Optional
 
 try:
     import httpx
-    from bs4 import BeautifulSoup
     _WEB_OK = True
 except ImportError:
     _WEB_OK = False
