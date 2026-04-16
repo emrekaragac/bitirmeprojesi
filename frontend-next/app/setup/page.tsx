@@ -44,8 +44,11 @@ const DOC_OPTIONS: { id: DocType; label: string; icon: string; desc: string }[] 
 ]
 
 const OPTION_LABELS: Record<string, string> = {
-  under_5000: "Under ₺5,000", "5000_10000": "₺5K–₺10K",
-  "10000_20000": "₺10K–₺20K", "20000_40000": "₺20K–₺40K", over_40000: "Over ₺40K",
+  under_22000: "₺22.000 altı (asgari ücret altı)",
+  "22000_40000": "₺22.000 – ₺40.000",
+  "40000_75000": "₺40.000 – ₺75.000",
+  "75000_150000": "₺75.000 – ₺150.000",
+  over_150000: "₺150.000 üstü",
   "4": "4.0 Scale", "100": "100 Scale",
   none: "None", A1: "A1", A2: "A2", B1: "B1", B2: "B2", C1: "C1", C2: "C2",
   yes: "Yes", no: "No",
@@ -70,7 +73,7 @@ function defaultScores(q: Omit<Question, "weight" | "answer_scores">): Record<st
 type QTemplate = Omit<Question, "weight" | "answer_scores">
 
 const FINANCIAL_QUESTIONS: QTemplate[] = [
-  { id: "monthly_income",    label: "Monthly Household Income",                                              type: "select", options: ["under_5000","5000_10000","10000_20000","20000_40000","over_40000"], required: true  },
+  { id: "monthly_income",    label: "Monthly Household Income",                                              type: "select", options: ["under_22000","22000_40000","40000_75000","75000_150000","over_150000"], required: true  },
   { id: "family_size",       label: "Family Size",                                                           type: "number", required: true  },
   { id: "has_car",           label: "Does the family own a car?",                                            type: "yesno",  required: true  },
   { id: "has_house",         label: "Does the family own a house?",                                          type: "yesno",  required: true  },

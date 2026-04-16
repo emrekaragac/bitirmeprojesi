@@ -42,11 +42,11 @@ type Result = {
 }
 
 const INCOME_OPTIONS = [
-  { val: "under_5000",   label: "Under ₺5,000" },
-  { val: "5000_10000",  label: "₺5,000 – ₺10,000" },
-  { val: "10000_20000", label: "₺10,000 – ₺20,000" },
-  { val: "20000_40000", label: "₺20,000 – ₺40,000" },
-  { val: "over_40000",  label: "Over ₺40,000" },
+  { val: "under_22000",   label: "₺22.000 altı — asgari ücret altı" },
+  { val: "22000_40000",   label: "₺22.000 – ₺40.000" },
+  { val: "40000_75000",   label: "₺40.000 – ₺75.000" },
+  { val: "75000_150000",  label: "₺75.000 – ₺150.000" },
+  { val: "over_150000",   label: "₺150.000 üstü" },
 ]
 
 const GPA_SYSTEM_OPTIONS = [

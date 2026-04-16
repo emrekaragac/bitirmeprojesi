@@ -201,28 +201,37 @@ def _safe_int(val):
 
 
 def _income_score(monthly_income_bracket, family_size):
+    # 2025 asgari ücret: ~22.104 TL net
     bracket_mid = {
-        "under_5000": 4_000,
-        "5000_10000": 7_500,
-        "10000_20000": 15_000,
-        "20000_40000": 30_000,
-        "over_40000": 50_000,
+        # Eski anahtarlar — geriye dönük uyumluluk
+        "under_5000":   10_000,
+        "5000_10000":   15_000,
+        "10000_20000":  20_000,
+        "20000_40000":  30_000,
+        "over_40000":   60_000,
+        # Yeni anahtarlar
+        "under_22000":   15_000,
+        "22000_40000":   30_000,
+        "40000_75000":   55_000,
+        "75000_150000": 110_000,
+        "over_150000":  200_000,
     }
 
     if not monthly_income_bracket or monthly_income_bracket not in bracket_mid:
-        return 12  # bilinmiyor -> orta puan
+        return 12  # bilinmiyor → orta puan
 
     mid = bracket_mid[monthly_income_bracket]
     size = max(1, family_size)
     per_person = mid / size
 
-    if per_person < 3_000:
+    # Kişi başı aylık gelir eşikleri (2025 fiyat seviyesi)
+    if per_person < 10_000:
         return 30
-    elif per_person < 5_000:
+    elif per_person < 18_000:
         return 24
-    elif per_person < 8_000:
+    elif per_person < 30_000:
         return 16
-    elif per_person < 15_000:
+    elif per_person < 55_000:
         return 8
     else:
         return 2
