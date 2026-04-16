@@ -17,7 +17,6 @@ type Question = {
   required: boolean
   weight: number
   answer_scores: Record<string, number>
-  source?: string   // referans platform
   custom?: boolean  // manuel eklenen soru
 }
 
@@ -71,51 +70,49 @@ function defaultScores(q: Omit<Question, "weight" | "answer_scores">): Record<st
 type QTemplate = Omit<Question, "weight" | "answer_scores">
 
 const FINANCIAL_QUESTIONS: QTemplate[] = [
-  { id: "monthly_income",   label: "Monthly Household Income",        type: "select", options: ["under_5000","5000_10000","10000_20000","20000_40000","over_40000"], required: true,  source: "FAFSA / SAI" },
-  { id: "family_size",      label: "Family Size",                     type: "number", required: true,  source: "FAFSA / SAI" },
-  { id: "has_car",          label: "Does the family own a car?",      type: "yesno",  required: true,  source: "YTB / TR Standard" },
-  { id: "has_house",        label: "Does the family own a house?",    type: "yesno",  required: true,  source: "YTB / TR Standard" },
-  { id: "is_renting",       label: "Currently renting?",             type: "yesno",  required: false, source: "FAFSA / SAI" },
-  { id: "parents_divorced", label: "Are parents divorced?",           type: "yesno",  required: false, source: "YTB / TR Standard" },
-  { id: "father_working",   label: "Is father employed?",             type: "yesno",  required: false, source: "YTB / TR Standard" },
-  { id: "mother_working",   label: "Is mother employed?",             type: "yesno",  required: false, source: "YTB / TR Standard" },
-  { id: "everyone_healthy", label: "Any chronic illness in family?",  type: "yesno",  required: false, source: "YTB / TR Standard" },
-  { id: "siblings_count",   label: "Number of siblings",              type: "number", required: false, source: "FAFSA / SAI" },
-  { id: "other_scholarship",label: "Already receiving a scholarship?",type: "yesno",  required: false, source: "DAAD / Erasmus+" },
-  { id: "works_part_time",  label: "Works part-time?",                type: "yesno",  required: false, source: "FAFSA / SAI" },
-  // Yeni finansal sorular
-  { id: "has_debt",         label: "Has regular debt/loan payments?", type: "yesno",  required: false, source: "ABD SAI Metodolojisi" },
-  { id: "siblings_in_uni",  label: "Siblings currently in university?",type: "yesno", required: false, source: "ABD SAI Metodolojisi" },
-  { id: "family_retired",   label: "Any retired family member?",      type: "yesno",  required: false, source: "ABD SAI Metodolojisi" },
-  { id: "family_supporting",label: "Financially supporting family members?", type: "yesno", required: false, source: "ABD SAI Metodolojisi" },
-  { id: "sudden_income_loss",label: "Major income loss in last year? (death, job loss, disaster)", type: "yesno", required: false, source: "AB Finansal Yardım Standartları" },
-  { id: "has_disability",   label: "Chronic illness or disability?",  type: "yesno",  required: false, source: "AB Finansal Yardım Standartları" },
-  { id: "family_needs_care",label: "Family member needing care due to illness/disability?", type: "yesno", required: false, source: "AB Finansal Yardım Standartları" },
-  { id: "first_gen_grad",   label: "University graduates in family?", type: "select", options: ["none_grad","one_grad","two_plus_grad"], required: false, source: "ABD FAFSA — First Generation" },
-  { id: "highschool_location",label: "High school location",          type: "select", options: ["big_city","town","village"], required: false, source: "ABD FAFSA — Geographic Disadvantage" },
-  { id: "device_access",    label: "Internet & device access?",       type: "select", options: ["own_device","shared","school_only"], required: false, source: "Dijital Eşitsizlik — UNESCO 2024" },
+  { id: "monthly_income",    label: "Monthly Household Income",                                              type: "select", options: ["under_5000","5000_10000","10000_20000","20000_40000","over_40000"], required: true  },
+  { id: "family_size",       label: "Family Size",                                                           type: "number", required: true  },
+  { id: "has_car",           label: "Does the family own a car?",                                            type: "yesno",  required: true  },
+  { id: "has_house",         label: "Does the family own a house?",                                          type: "yesno",  required: true  },
+  { id: "is_renting",        label: "Currently renting?",                                                    type: "yesno",  required: false },
+  { id: "parents_divorced",  label: "Are parents divorced?",                                                 type: "yesno",  required: false },
+  { id: "father_working",    label: "Is father employed?",                                                   type: "yesno",  required: false },
+  { id: "mother_working",    label: "Is mother employed?",                                                   type: "yesno",  required: false },
+  { id: "everyone_healthy",  label: "Any chronic illness in family?",                                        type: "yesno",  required: false },
+  { id: "siblings_count",    label: "Number of siblings",                                                    type: "number", required: false },
+  { id: "other_scholarship", label: "Already receiving a scholarship?",                                      type: "yesno",  required: false },
+  { id: "works_part_time",   label: "Works part-time?",                                                      type: "yesno",  required: false },
+  { id: "has_debt",          label: "Has regular debt/loan payments?",                                       type: "yesno",  required: false },
+  { id: "siblings_in_uni",   label: "Siblings currently in university?",                                     type: "yesno",  required: false },
+  { id: "family_retired",    label: "Any retired family member?",                                            type: "yesno",  required: false },
+  { id: "family_supporting", label: "Financially supporting family members?",                                type: "yesno",  required: false },
+  { id: "sudden_income_loss",label: "Major income loss in last year? (death, job loss, disaster)",           type: "yesno",  required: false },
+  { id: "has_disability",    label: "Chronic illness or disability?",                                        type: "yesno",  required: false },
+  { id: "family_needs_care", label: "Family member needing care due to illness/disability?",                 type: "yesno",  required: false },
+  { id: "first_gen_grad",    label: "University graduates in family?",   type: "select", options: ["none_grad","one_grad","two_plus_grad"],    required: false },
+  { id: "highschool_location",label: "High school location",             type: "select", options: ["big_city","town","village"],               required: false },
+  { id: "device_access",     label: "Internet & device access?",         type: "select", options: ["own_device","shared","school_only"],       required: false },
 ]
 
 const ACADEMIC_QUESTIONS: QTemplate[] = [
-  { id: "gpa",            label: "GPA",                             type: "number", required: true,  source: "Erasmus+ / DAAD" },
-  { id: "gpa_system",     label: "GPA System (4 or 100)",           type: "select", options: ["4","100"], required: true, source: "Erasmus+ / DAAD" },
-  { id: "has_research",   label: "Involved in research?",           type: "yesno",  required: false, source: "Fulbright / DAAD" },
-  { id: "has_award",      label: "Has academic award?",             type: "yesno",  required: false, source: "Rhodes / Gates Cambridge" },
-  { id: "language_level", label: "Foreign language level",          type: "select", options: ["none","A1","A2","B1","B2","C1","C2"], required: false, source: "DAAD / Erasmus+" },
-  { id: "has_activity",   label: "Active in student clubs?",        type: "yesno",  required: false, source: "Chevening / Commonwealth" },
-  // Yeni akademik sorular
-  { id: "has_lang_cert",  label: "Has international language certificate? (IELTS, TOEFL, DELF…)", type: "yesno", required: false, source: "DAAD / Erasmus+" },
-  { id: "has_intl_exp",   label: "International education/internship/exchange experience?", type: "yesno", required: false, source: "DAAD / Erasmus+" },
-  { id: "has_patent",     label: "Registered product, patent or original software?", type: "yesno", required: false, source: "TÜBİTAK Ekosistemi" },
-  { id: "has_tubitak",    label: "Participated in TÜBİTAK / TEKNOFEST or similar?", type: "yesno", required: false, source: "TÜBİTAK Ekosistemi" },
+  { id: "gpa",            label: "GPA",                                                                       type: "number", required: true  },
+  { id: "gpa_system",     label: "GPA System (4 or 100)",                        type: "select", options: ["4","100"],                         required: true  },
+  { id: "has_research",   label: "Involved in research?",                                                     type: "yesno",  required: false },
+  { id: "has_award",      label: "Has academic award?",                                                       type: "yesno",  required: false },
+  { id: "language_level", label: "Foreign language level",                        type: "select", options: ["none","A1","A2","B1","B2","C1","C2"], required: false },
+  { id: "has_activity",   label: "Active in student clubs?",                                                  type: "yesno",  required: false },
+  { id: "has_lang_cert",  label: "Has international language certificate? (IELTS, TOEFL, DELF…)",            type: "yesno",  required: false },
+  { id: "has_intl_exp",   label: "International education/internship/exchange experience?",                   type: "yesno",  required: false },
+  { id: "has_patent",     label: "Registered product, patent or original software?",                         type: "yesno",  required: false },
+  { id: "has_tubitak",    label: "Participated in TÜBİTAK / TEKNOFEST or similar?",                         type: "yesno",  required: false },
 ]
 
 const LEADERSHIP_QUESTIONS: QTemplate[] = [
-  { id: "has_leadership_role", label: "Leadership role in student club/association?", type: "yesno", required: false, source: "Chevening / Rhodes / Gates Cambridge" },
-  { id: "volunteer_hours",     label: "Volunteer activity hours in last 2 years",    type: "select", options: ["0h","1_10h","11_50h","50h_plus"], required: false, source: "Chevening / Gates Cambridge" },
-  { id: "has_social_project",  label: "Independently started a social project? (NGO, campaign, initiative)", type: "yesno", required: false, source: "Gates Cambridge / Rhodes" },
-  { id: "has_youth_platform",  label: "Represented at national/international youth platform? (Model UN, Parliament…)", type: "yesno", required: false, source: "Chevening / Commonwealth" },
-  { id: "has_startup",         label: "Active business venture? (sole proprietorship, startup…)", type: "yesno", required: false, source: "TÜBİTAK Ekosistemi / Fulbright" },
+  { id: "has_leadership_role", label: "Leadership role in student club/association?",                        type: "yesno",  required: false },
+  { id: "volunteer_hours",     label: "Volunteer activity hours in last 2 years",   type: "select", options: ["0h","1_10h","11_50h","50h_plus"], required: false },
+  { id: "has_social_project",  label: "Independently started a social project? (NGO, campaign, initiative)", type: "yesno",  required: false },
+  { id: "has_youth_platform",  label: "Represented at national/international youth platform? (Model UN, Parliament…)", type: "yesno", required: false },
+  { id: "has_startup",         label: "Active business venture? (sole proprietorship, startup…)",            type: "yesno",  required: false },
 ]
 
 
@@ -197,7 +194,6 @@ export default function SetupPage() {
       required: false,
       weight: 0,
       answer_scores: defaultScores({ id, label: customForm.label, type: customForm.type, options, required: false }),
-      source: "Custom",
       custom: true,
     }
     setConfig(prev => ({ ...prev, questions: [...prev.questions, newQ] }))
@@ -490,7 +486,6 @@ export default function SetupPage() {
             {config.questions.length > 0 && (
               <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm text-indigo-700">
                 {config.questions.length} question{config.questions.length > 1 ? "s" : ""} selected
-                {config.questions.filter(q => q.custom).length > 0 && ` (${config.questions.filter(q => q.custom).length} custom)`}
               </div>
             )}
 
@@ -539,9 +534,6 @@ export default function SetupPage() {
                       <h3 className="font-bold text-slate-800 text-sm">{q.label}</h3>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-slate-400">{q.type === "yesno" ? "Yes/No" : q.type === "select" ? "Dropdown" : q.type}</span>
-                        {q.custom && (
-                          <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">✏️ Custom</span>
-                        )}
                       </div>
                     </div>
                     <div className="text-right ml-3">
@@ -636,16 +628,15 @@ export default function SetupPage() {
               {config.deadline && (
                 <div className="flex justify-between"><span className="text-sm text-slate-500">Deadline</span><span className="text-sm font-semibold text-slate-800">{config.deadline}</span></div>
               )}
-              <div className="flex justify-between"><span className="text-sm text-slate-500">Questions</span><span className="text-sm font-semibold text-slate-800">{config.questions.length} selected ({config.questions.filter(q=>q.custom).length} custom)</span></div>
+              <div className="flex justify-between"><span className="text-sm text-slate-500">Questions</span><span className="text-sm font-semibold text-slate-800">{config.questions.length} selected</span></div>
               {config.questions.length > 0 && (
                 <div>
-                  <span className="text-sm text-slate-500 block mb-1.5">Question Weights & Sources</span>
+                  <span className="text-sm text-slate-500 block mb-1.5">Question Weights</span>
                   <div className="space-y-1.5">
                     {config.questions.map(q => (
                       <div key={q.id} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-3 py-1.5">
                         <span className="text-slate-600 flex-1">{q.label}</span>
                         <div className="flex items-center gap-2">
-                          {q.custom && <span className="text-[10px] text-slate-400">✏️ Custom</span>}
                           <span className="font-bold text-indigo-600 w-10 text-right">{q.weight}%</span>
                         </div>
                       </div>
