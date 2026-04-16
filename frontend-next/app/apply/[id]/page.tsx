@@ -524,9 +524,9 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                               ? "border-emerald-300 text-emerald-600"
                               : "border-red-300 text-red-500"
                         }`}>
-                        {file ? file.name : "Dosya seçmek için tıklayın (PDF veya görsel)"}
+                        {file ? file.name : "PDF seçmek için tıklayın"}
                       </div>
-                      <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                      <input type="file" accept=".pdf"
                         onChange={e => setFile(docId, e.target.files?.[0] || null)}
                         className="hidden" />
                     </label>
@@ -541,10 +541,11 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               })}
             </div>
 
-            {/* Geçersiz belge uyarısı */}
-            {Object.entries(docValidation).some(([, v]) => !v.checking && !v.valid) && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
-                ⚠️ Bazı belgeler doğrulanamadı. Lütfen yukarıdaki hataları düzeltin veya yine de göndermek için &quot;Yine de Gönder&quot; seçeneğini kullanın.
+            {/* Geçersiz belge uyarısı — gönderimi engeller */}
+            {Object.values(docValidation).some(v => !v.checking && !v.valid) && (
+              <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-sm text-red-700 space-y-1">
+                <p className="font-bold">❌ Geçersiz belge tespit edildi</p>
+                <p>Lütfen kırmızı işaretli belgeleri kaldırıp doğru belgeyi yükleyin. Yanlış belgeyle başvuru gönderilemez.</p>
               </div>
             )}
 
@@ -552,8 +553,12 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               <button onClick={() => goStep(1)} className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm">← Geri</button>
               <button
                 onClick={handleSubmit}
-                disabled={loading || Object.values(docValidation).some(v => v.checking)}
-                className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-3 text-sm disabled:opacity-50"
+                disabled={
+                  loading ||
+                  Object.values(docValidation).some(v => v.checking) ||
+                  Object.values(docValidation).some(v => !v.checking && !v.valid)
+                }
+                className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">

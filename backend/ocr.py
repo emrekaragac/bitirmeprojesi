@@ -75,7 +75,6 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
     Yüklenen dosyanın beklenen belge türüne uygun olup olmadığını kontrol eder.
     Döndürür: {valid, expected_name, detected_name, message, confidence, hits}
     """
-    text = extract_text(file_path)
     sig = DOC_SIGNATURES.get(expected_doc_id)
 
     if not sig:
@@ -88,14 +87,17 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             "hits": 0,
         }
 
-    if not text or len(text.strip()) < 30:
+    text = extract_text(file_path)
+
+    # PDF okunamıyor veya çok kısa — geçersiz say
+    if not text or len(text.strip()) < 50:
         return {
             "valid": False,
             "expected_name": sig["name"],
             "detected_name": None,
             "message": (
-                f"Belge okunamadı. Lütfen net bir {sig['name']} fotoğrafı "
-                "veya geçerli PDF yükleyin."
+                f"❌ Belge okunamadı veya boş. "
+                f"Lütfen metin içeren geçerli bir {sig['name']} PDF'i yükleyin."
             ),
             "confidence": 0.0,
             "hits": 0,
@@ -124,14 +126,14 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
         detected = sig["name"]
     elif best_other:
         message = (
-            f"❌ Bu belge '{best_other}' gibi görünüyor. "
-            f"Lütfen geçerli bir {sig['name']} yükleyin."
+            f"❌ Yüklenen dosya '{best_other}' gibi görünüyor. "
+            f"Bu alana lütfen geçerli bir {sig['name']} yükleyin."
         )
         detected = best_other
     else:
         message = (
-            f"❌ Bu belgenin {sig['name']} olduğu doğrulanamadı. "
-            "Lütfen doğru belgeyi yükleyin."
+            f"❌ Bu PDF'in {sig['name']} olduğu doğrulanamadı. "
+            f"Lütfen doğru belgeyi yükleyin."
         )
         detected = None
 
