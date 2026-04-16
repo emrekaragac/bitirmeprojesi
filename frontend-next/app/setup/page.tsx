@@ -399,11 +399,6 @@ export default function SetupPage() {
                           <div className="text-sm font-medium text-slate-800">{q.label}</div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-slate-400">{q.type === "yesno" ? "Yes/No" : q.type === "select" ? "Dropdown" : "Number"}</span>
-                            {q.source && (
-                              <span className="text-[10px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full font-medium">
-                                📚 {q.source}
-                              </span>
-                            )}
                           </div>
                         </div>
                       </label>
@@ -544,10 +539,8 @@ export default function SetupPage() {
                       <h3 className="font-bold text-slate-800 text-sm">{q.label}</h3>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-slate-400">{q.type === "yesno" ? "Yes/No" : q.type === "select" ? "Dropdown" : q.type}</span>
-                        {q.source && (
-                          <span className="text-[10px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full">
-                            {q.custom ? "✏️ Custom" : `📚 ${q.source}`}
-                          </span>
+                        {q.custom && (
+                          <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">✏️ Custom</span>
                         )}
                       </div>
                     </div>
@@ -652,7 +645,7 @@ export default function SetupPage() {
                       <div key={q.id} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-3 py-1.5">
                         <span className="text-slate-600 flex-1">{q.label}</span>
                         <div className="flex items-center gap-2">
-                          {q.source && <span className="text-[10px] text-violet-500">{q.custom ? "✏️ Custom" : `📚 ${q.source}`}</span>}
+                          {q.custom && <span className="text-[10px] text-slate-400">✏️ Custom</span>}
                           <span className="font-bold text-indigo-600 w-10 text-right">{q.weight}%</span>
                         </div>
                       </div>
