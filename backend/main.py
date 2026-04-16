@@ -12,7 +12,7 @@ from backend.academic_scoring import compute_academic_score
 from backend.parametric_scoring import compute_parametric_score
 from backend.reporting import generate_report
 from backend.rag_valuation import rag_estimate_property, rag_estimate_car
-from backend.ocr import parse_ruhsat, parse_tapu
+from backend.ocr import parse_ruhsat, parse_tapu, validate_document
 from backend.verification import validate_tc_no, scan_qr, cross_check
 from backend.db import init_db, save_application, get_all_applications, get_application
 from backend.scholarship_db import (
@@ -52,6 +52,35 @@ app.add_middleware(
 @app.get("/")
 def root():
     return {"message": "PSDS API running", "version": "3.0"}
+
+
+# ─────────────────────────────────────────────────────────────
+# DOCUMENT VALIDATION  — anlık belge doğrulama
+# ─────────────────────────────────────────────────────────────
+
+@app.post("/validate-document/{doc_type}")
+async def validate_doc_endpoint(
+    doc_type: str,
+    file: UploadFile = File(...),
+):
+    """
+    Yüklenen dosyanın beklenen belge türüne uyup uymadığını kontrol eder.
+    doc_type: car_file | house_file | transcript_file | income_file |
+              student_certificate | family_registry | disability_report
+    """
+    import tempfile
+    suffix = os.path.splitext(file.filename or "doc")[1] or ".pdf"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+    try:
+        result = validate_document(tmp_path, doc_type)
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+    return result
 
 
 # ─────────────────────────────────────────────────────────────

@@ -101,6 +101,12 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
   const [loading, setLoading] = useState(false)
   const [result, setResult]  = useState<Result | null>(null)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [docValidation, setDocValidation] = useState<Record<string, {
+    valid: boolean
+    message: string
+    checking: boolean
+  }>>({})
+
 
   const DRAFT_KEY = `psds_draft_${id}`
 
@@ -146,11 +152,33 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
     saveDraft(values, s)
   }
 
-  function setFile(key: string, f: File | null) {
+  async function setFile(key: string, f: File | null) {
     setFiles(prev => {
       if (!f) { const n = { ...prev }; delete n[key]; return n }
       return { ...prev, [key]: f }
     })
+    if (!f) {
+      setDocValidation(prev => { const n = { ...prev }; delete n[key]; return n })
+      return
+    }
+    // Anlık doğrulama — backend'e gönder
+    setDocValidation(prev => ({ ...prev, [key]: { valid: false, message: "", checking: true } }))
+    try {
+      const fd = new FormData()
+      fd.append("file", f)
+      const res = await fetch(`${API}/validate-document/${key}`, { method: "POST", body: fd })
+      if (res.ok) {
+        const data = await res.json()
+        setDocValidation(prev => ({
+          ...prev,
+          [key]: { valid: data.valid, message: data.message, checking: false },
+        }))
+      } else {
+        setDocValidation(prev => ({ ...prev, [key]: { valid: true, message: "", checking: false } }))
+      }
+    } catch {
+      setDocValidation(prev => ({ ...prev, [key]: { valid: true, message: "", checking: false } }))
+    }
   }
 
   async function handleSubmit() {
@@ -450,43 +478,86 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
 
               {documents.map(docId => {
                 const meta = DOC_LABELS[docId] || { label: docId, icon: "📄" }
-                const file = files[docId]
+                const file  = files[docId]
+                const dv    = docValidation[docId]
+                const isChecking = dv?.checking
+                const isValid    = dv ? dv.valid : true   // henüz kontrol yok → nötr
+                const borderCls  = !file
+                  ? "border-slate-200"
+                  : isChecking
+                    ? "border-amber-300 bg-amber-50"
+                    : isValid
+                      ? "border-emerald-300 bg-emerald-50"
+                      : "border-red-300 bg-red-50"
                 return (
-                  <div key={docId} className={`p-4 rounded-xl border-2 transition ${file ? "border-emerald-300 bg-emerald-50" : "border-slate-200"}`}>
+                  <div key={docId} className={`p-4 rounded-xl border-2 transition ${borderCls}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-xl">{meta.icon}</span>
                         <span className="text-sm font-semibold text-slate-800">{meta.label}</span>
                       </div>
-                      {file && <span className="text-xs text-emerald-600 font-semibold">✓ Uploaded</span>}
+                      {file && (
+                        isChecking ? (
+                          <span className="flex items-center gap-1 text-xs text-amber-600 font-semibold">
+                            <span className="w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                            Doğrulanıyor…
+                          </span>
+                        ) : isValid ? (
+                          <span className="text-xs text-emerald-600 font-semibold">✅ Geçerli</span>
+                        ) : (
+                          <span className="text-xs text-red-600 font-semibold">❌ Geçersiz</span>
+                        )
+                      )}
                     </div>
                     <label className="block cursor-pointer">
                       <div className={`border-2 border-dashed rounded-xl p-3 text-center text-xs transition
-                        ${file ? "border-emerald-300 text-emerald-600" : "border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500"}`}>
-                        {file ? file.name : "Click to select file (PDF or image)"}
+                        ${!file
+                          ? "border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500"
+                          : isChecking
+                            ? "border-amber-300 text-amber-600"
+                            : isValid
+                              ? "border-emerald-300 text-emerald-600"
+                              : "border-red-300 text-red-500"
+                        }`}>
+                        {file ? file.name : "Dosya seçmek için tıklayın (PDF veya görsel)"}
                       </div>
                       <input type="file" accept=".pdf,.jpg,.jpeg,.png"
                         onChange={e => setFile(docId, e.target.files?.[0] || null)}
                         className="hidden" />
                     </label>
+                    {/* Doğrulama mesajı */}
+                    {file && !isChecking && dv?.message && (
+                      <p className={`mt-2 text-xs font-medium ${isValid ? "text-emerald-700" : "text-red-600"}`}>
+                        {dv.message}
+                      </p>
+                    )}
                   </div>
                 )
               })}
             </div>
 
+            {/* Geçersiz belge uyarısı */}
+            {Object.entries(docValidation).some(([, v]) => !v.checking && !v.valid) && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+                ⚠️ Bazı belgeler doğrulanamadı. Lütfen yukarıdaki hataları düzeltin veya yine de göndermek için &quot;Yine de Gönder&quot; seçeneğini kullanın.
+              </div>
+            )}
+
             <div className="flex gap-3">
-              <button onClick={() => goStep(1)} className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm">← Back</button>
+              <button onClick={() => goStep(1)} className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm">← Geri</button>
               <button
                 onClick={handleSubmit}
-                disabled={loading}
+                disabled={loading || Object.values(docValidation).some(v => v.checking)}
                 className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-3 text-sm disabled:opacity-50"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
                     <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Analyzing…
+                    Analiz ediliyor…
                   </span>
-                ) : "Submit Application →"}
+                ) : Object.values(docValidation).some(v => v.checking)
+                  ? "Belgeler kontrol ediliyor…"
+                  : "Başvuruyu Gönder →"}
               </button>
             </div>
           </div>

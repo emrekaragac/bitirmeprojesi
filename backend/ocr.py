@@ -2,6 +2,148 @@ import os
 import re
 from typing import Optional
 
+# ── Belge imzaları — anahtar kelime tabanlı doğrulama ─────────
+DOC_SIGNATURES: dict = {
+    "car_file": {
+        "name": "Araç Ruhsatı",
+        "keywords": [
+            "RUHSAT", "TESCİL", "PLAKA", "ARAÇ", "ŞASI NO", "ŞASI NUMARASI",
+            "MOTOR NO", "MOTOR NUMARASI", "TRAFİK TESCİL", "MOTORLU TAŞIT",
+            "CİNS", "MARKA", "TİP", "RENK", "MODEL YILI",
+        ],
+        "min_hits": 2,
+    },
+    "house_file": {
+        "name": "Tapu Senedi",
+        "keywords": [
+            "TAPU", "MALİK", "PARSEL", "ADA", "YÜZÖLÇÜM", "KADASTRO",
+            "MÜLKİYET", "TKGM", "TAPU VE KADASTRO", "GAYRİMENKUL",
+            "BAĞIMSIZ BÖLÜM", "ARSA PAYI",
+        ],
+        "min_hits": 2,
+    },
+    "transcript_file": {
+        "name": "Transkript / Not Dökümü",
+        "keywords": [
+            "TRANSKRİPT", "NOT DÖKÜM", "GNO", "DÖNEM", "DERS KODU",
+            "GPA", "GRADE", "ORTALAMA", "KREDİ", "SINAV NOTU",
+            "ÜNİVERSİTE", "FAKÜLTE", "BÖLÜM",
+        ],
+        "min_hits": 3,
+    },
+    "income_file": {
+        "name": "Gelir / Maaş Belgesi",
+        "keywords": [
+            "BORDRO", "MAAŞ", "SGK", "NET ÜCRET", "BRÜT", "GELİR VERGİSİ",
+            "AYLIK ÜCRETİ", "SOSYAL GÜVENLİK", "PRİM", "KESİNTİ",
+            "ÖDEME TUTARI", "ÇALIŞAN",
+        ],
+        "min_hits": 2,
+    },
+    "student_certificate": {
+        "name": "Öğrenci Belgesi",
+        "keywords": [
+            "ÖĞRENCİ BELGESİ", "ÖĞRENCİ", "KAYITLI", "ÜNİVERSİTE",
+            "BÖLÜM", "SINIF", "ÖĞRENCİ NUMARASI", "FAKÜLTE",
+            "AKTİF ÖĞRENCİ", "ÖĞRENCİ İŞLERİ",
+        ],
+        "min_hits": 2,
+    },
+    "family_registry": {
+        "name": "Nüfus / Aile Kayıt Örneği",
+        "keywords": [
+            "NÜFUS", "AİLE", "KÜTÜKLERİ", "VUKUATLI", "NÜFUS MÜDÜRLÜĞÜ",
+            "TC KİMLİK", "DOĞUM YERİ", "ANA ADI", "BABA ADI",
+            "MERNİS", "E-DEVLET",
+        ],
+        "min_hits": 2,
+    },
+    "disability_report": {
+        "name": "Sağlık / Engel Raporu",
+        "keywords": [
+            "RAPOR", "SAĞLIK KURULU", "ENGELLİLİK", "HASTANE",
+            "HEYET RAPORU", "TANI", "HASTALIK", "ENGELLİLİK ORANI",
+            "SAĞLIK KURUMU", "DOKTOR", "HEKİM",
+        ],
+        "min_hits": 2,
+    },
+}
+
+
+def validate_document(file_path: str, expected_doc_id: str) -> dict:
+    """
+    Yüklenen dosyanın beklenen belge türüne uygun olup olmadığını kontrol eder.
+    Döndürür: {valid, expected_name, detected_name, message, confidence, hits}
+    """
+    text = extract_text(file_path)
+    sig = DOC_SIGNATURES.get(expected_doc_id)
+
+    if not sig:
+        return {
+            "valid": True,
+            "expected_name": expected_doc_id,
+            "detected_name": expected_doc_id,
+            "message": "Belge alındı.",
+            "confidence": 1.0,
+            "hits": 0,
+        }
+
+    if not text or len(text.strip()) < 30:
+        return {
+            "valid": False,
+            "expected_name": sig["name"],
+            "detected_name": None,
+            "message": (
+                f"Belge okunamadı. Lütfen net bir {sig['name']} fotoğrafı "
+                "veya geçerli PDF yükleyin."
+            ),
+            "confidence": 0.0,
+            "hits": 0,
+        }
+
+    text_upper = text.upper()
+
+    # Beklenen türe kaç anahtar kelime eşleşti?
+    hits = sum(1 for kw in sig["keywords"] if kw in text_upper)
+    confidence = round(hits / len(sig["keywords"]), 2)
+    valid = hits >= sig["min_hits"]
+
+    # Başka bir tür mü daha çok eşleşiyor?
+    best_other: Optional[str] = None
+    best_other_hits = 0
+    for doc_id, other_sig in DOC_SIGNATURES.items():
+        if doc_id == expected_doc_id:
+            continue
+        other_hits = sum(1 for kw in other_sig["keywords"] if kw in text_upper)
+        if other_hits >= other_sig["min_hits"] and other_hits > best_other_hits:
+            best_other_hits = other_hits
+            best_other = other_sig["name"]
+
+    if valid:
+        message = f"✅ Geçerli {sig['name']} tespit edildi."
+        detected = sig["name"]
+    elif best_other:
+        message = (
+            f"❌ Bu belge '{best_other}' gibi görünüyor. "
+            f"Lütfen geçerli bir {sig['name']} yükleyin."
+        )
+        detected = best_other
+    else:
+        message = (
+            f"❌ Bu belgenin {sig['name']} olduğu doğrulanamadı. "
+            "Lütfen doğru belgeyi yükleyin."
+        )
+        detected = None
+
+    return {
+        "valid": valid,
+        "expected_name": sig["name"],
+        "detected_name": detected,
+        "message": message,
+        "confidence": confidence,
+        "hits": hits,
+    }
+
 
 def _extract_text_from_pdf(file_path: str) -> str:
     try:
