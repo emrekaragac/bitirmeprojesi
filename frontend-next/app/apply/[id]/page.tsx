@@ -27,13 +27,15 @@ type Scholarship = {
   }
 }
 
+type BreakdownEntry = number | { weight: number; answer: string; score: number; points: number }
+
 type Result = {
   application_id: number
   score: number
   priority: string
   decision: string
   reasons: string[]
-  breakdown: Record<string, number>
+  breakdown: Record<string, BreakdownEntry>
   property_estimated_value?: number
   avg_m2_price?: number
   estimated_car_value?: number
@@ -521,22 +523,38 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
               <h3 className="font-bold text-slate-700 mb-4">Score Breakdown</h3>
               <div className="space-y-3">
-                {Object.entries(result.breakdown || {}).map(([key, val]) => (
-                  <div key={key}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-slate-500 capitalize">{key.replace(/_/g, " ")}</span>
-                      <span className={`font-bold ${Number(val) < 0 ? "text-red-500" : "text-indigo-600"}`}>
-                        {Number(val) > 0 ? `+${val}` : val}
-                      </span>
+                {Object.entries(result.breakdown || {}).map(([key, val]) => {
+                  // Parametric scoring returns objects; legacy scoring returns numbers
+                  const isObj = typeof val === "object" && val !== null
+                  const points = isObj ? (val as { points: number }).points : Number(val)
+                  const score  = isObj ? (val as { score: number }).score  : Number(val)
+                  const answer = isObj ? (val as { answer: string }).answer : undefined
+                  const weight = isObj ? (val as { weight: number }).weight : undefined
+                  const barPct = isObj
+                    ? Math.min(Math.abs(score), 100)
+                    : Math.min(Math.abs(points) * 3, 100)
+                  return (
+                    <div key={key}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-slate-500 capitalize">{key.replace(/_/g, " ")}</span>
+                        <div className="text-right">
+                          <span className={`font-bold ${points < 0 ? "text-red-500" : "text-indigo-600"}`}>
+                            {points > 0 ? `+${points}` : points} pts
+                          </span>
+                          {answer !== undefined && (
+                            <span className="ml-2 text-slate-400">({answer}{weight !== undefined ? `, w:${weight}%` : ""})</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full ${points < 0 ? "bg-red-400" : "bg-indigo-500"}`}
+                          style={{ width: `${isNaN(barPct) ? 0 : barPct}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5">
-                      <div
-                        className={`h-1.5 rounded-full ${Number(val) < 0 ? "bg-red-400" : "bg-indigo-500"}`}
-                        style={{ width: `${Math.min(Math.abs(Number(val)) * 3, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 
