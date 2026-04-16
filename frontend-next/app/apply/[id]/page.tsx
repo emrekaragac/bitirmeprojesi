@@ -191,15 +191,20 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
         "university","department","grade","gender"].forEach(k => {
         fd.append(k, values[k] || "")
       })
-      // scholarship questions
-      scholarship.config.questions.forEach(q => {
-        fd.append(q.id, values[q.id] || (q.type === "yesno" ? "no" : ""))
-      })
-      // car/house sub-fields if needed
+      // car/house sub-fields
       ;["car_brand","car_model","car_year","car_damage",
         "city","district","square_meters"].forEach(k => {
         fd.append(k, values[k] || "")
       })
+      // scholarship questions — hem doğrudan ekle (eski alanlar için)
+      // hem de extra_fields JSON olarak gönder (yeni/custom sorular backend'e ulaşsın)
+      const extraFields: Record<string, string> = {}
+      scholarship.config.questions.forEach(q => {
+        const val = values[q.id] ?? (q.type === "yesno" ? "no" : "")
+        fd.append(q.id, val)
+        extraFields[q.id] = val
+      })
+      fd.append("extra_fields", JSON.stringify(extraFields))
       // files
       scholarship.config.documents.forEach(docId => {
         if (files[docId]) fd.append(docId, files[docId])

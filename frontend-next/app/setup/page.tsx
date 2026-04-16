@@ -545,7 +545,13 @@ export default function SetupPage() {
                   </div>
 
                   <div className="border-t border-slate-100 pt-3">
-                    <p className="text-xs font-semibold text-slate-500 mb-2">Answer Scores (0 = lowest, 100 = highest need)</p>
+                    <p className="text-xs font-semibold text-slate-500 mb-2">
+                      Answer Scores
+                      <span className="ml-1 font-normal text-slate-400">(0 = düşük öncelik, 100 = yüksek öncelik)</span>
+                      {q.weight > 0 && Object.values(q.answer_scores).every(s => s === 0) && (
+                        <span className="ml-2 text-amber-600 font-bold">⚠️ Henüz puan girilmedi!</span>
+                      )}
+                    </p>
                     <div className="space-y-2">
                       {optionKeys.map(opt => (
                         <div key={opt} className="flex items-center gap-3">
@@ -631,16 +637,24 @@ export default function SetupPage() {
               <div className="flex justify-between"><span className="text-sm text-slate-500">Questions</span><span className="text-sm font-semibold text-slate-800">{config.questions.length} selected</span></div>
               {config.questions.length > 0 && (
                 <div>
-                  <span className="text-sm text-slate-500 block mb-1.5">Question Weights</span>
+                  <span className="text-sm text-slate-500 block mb-1.5">Question Weights & Scores</span>
                   <div className="space-y-1.5">
-                    {config.questions.map(q => (
-                      <div key={q.id} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-3 py-1.5">
-                        <span className="text-slate-600 flex-1">{q.label}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-indigo-600 w-10 text-right">{q.weight}%</span>
+                    {config.questions.map(q => {
+                      const allZero = Object.values(q.answer_scores).every(s => s === 0)
+                      return (
+                        <div key={q.id} className={`rounded-lg px-3 py-2 text-xs ${allZero && q.weight > 0 ? "bg-amber-50 border border-amber-200" : "bg-slate-50"}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-600 flex-1">{q.label}</span>
+                            <span className="font-bold text-indigo-600 w-10 text-right">{q.weight}%</span>
+                          </div>
+                          {allZero && q.weight > 0 && (
+                            <p className="text-amber-700 mt-1 font-medium">
+                              ⚠️ Tüm cevap puanları 0 — bu soru hiç puan vermeyecek. Geri dönüp puan ayarlayın.
+                            </p>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}
