@@ -6,66 +6,74 @@ from typing import Optional
 DOC_SIGNATURES: dict = {
     "car_file": {
         "name": "Araç Ruhsatı",
+        # required_any: en az biri ZORUNLU — belgede kesinlikle bu kelimelerden biri olmalı
+        "required_any": ["RUHSAT", "TRAFİK TESCİL", "MOTORLU TAŞIT", "ŞASI NO", "ŞASI NUMARASI", "MOTOR NO"],
         "keywords": [
             "RUHSAT", "TESCİL", "PLAKA", "ARAÇ", "ŞASI NO", "ŞASI NUMARASI",
             "MOTOR NO", "MOTOR NUMARASI", "TRAFİK TESCİL", "MOTORLU TAŞIT",
             "CİNS", "MARKA", "TİP", "RENK", "MODEL YILI",
         ],
-        "min_hits": 2,
+        "min_hits": 3,
     },
     "house_file": {
         "name": "Tapu Senedi",
+        "required_any": ["TAPU", "TKGM", "TAPU VE KADASTRO", "KADASTRO MÜDÜRLÜĞÜ", "MALİK", "PARSEL"],
         "keywords": [
             "TAPU", "MALİK", "PARSEL", "ADA", "YÜZÖLÇÜM", "KADASTRO",
             "MÜLKİYET", "TKGM", "TAPU VE KADASTRO", "GAYRİMENKUL",
             "BAĞIMSIZ BÖLÜM", "ARSA PAYI",
         ],
-        "min_hits": 2,
+        "min_hits": 3,
     },
     "transcript_file": {
         "name": "Transkript / Not Dökümü",
+        "required_any": ["TRANSKRİPT", "NOT DÖKÜM", "GNO", "GPA", "GRADE", "DERS KODU", "SINAV NOTU"],
         "keywords": [
             "TRANSKRİPT", "NOT DÖKÜM", "GNO", "DÖNEM", "DERS KODU",
             "GPA", "GRADE", "ORTALAMA", "KREDİ", "SINAV NOTU",
             "ÜNİVERSİTE", "FAKÜLTE", "BÖLÜM",
         ],
-        "min_hits": 3,
+        "min_hits": 4,
     },
     "income_file": {
         "name": "Gelir / Maaş Belgesi",
+        "required_any": ["BORDRO", "MAAŞ BORDROSU", "SGK", "NET ÜCRET", "BRÜT ÜCRET", "GELİR VERGİSİ", "AYLIK ÜCRETİ"],
         "keywords": [
             "BORDRO", "MAAŞ", "SGK", "NET ÜCRET", "BRÜT", "GELİR VERGİSİ",
             "AYLIK ÜCRETİ", "SOSYAL GÜVENLİK", "PRİM", "KESİNTİ",
             "ÖDEME TUTARI", "ÇALIŞAN",
         ],
-        "min_hits": 2,
+        "min_hits": 3,
     },
     "student_certificate": {
         "name": "Öğrenci Belgesi",
+        "required_any": ["ÖĞRENCİ BELGESİ", "ÖĞRENCİ NUMARASI", "AKTİF ÖĞRENCİ", "ÖĞRENCİ İŞLERİ", "ÖĞRENCININ"],
         "keywords": [
             "ÖĞRENCİ BELGESİ", "ÖĞRENCİ", "KAYITLI", "ÜNİVERSİTE",
             "BÖLÜM", "SINIF", "ÖĞRENCİ NUMARASI", "FAKÜLTE",
             "AKTİF ÖĞRENCİ", "ÖĞRENCİ İŞLERİ",
         ],
-        "min_hits": 2,
+        "min_hits": 3,
     },
     "family_registry": {
         "name": "Nüfus / Aile Kayıt Örneği",
+        "required_any": ["NÜFUS", "VUKUATLI", "NÜFUS MÜDÜRLÜĞÜ", "MERNİS", "KÜTÜKLERİ", "AİLE KÜTÜKLERİ"],
         "keywords": [
             "NÜFUS", "AİLE", "KÜTÜKLERİ", "VUKUATLI", "NÜFUS MÜDÜRLÜĞÜ",
             "TC KİMLİK", "DOĞUM YERİ", "ANA ADI", "BABA ADI",
             "MERNİS", "E-DEVLET",
         ],
-        "min_hits": 2,
+        "min_hits": 3,
     },
     "disability_report": {
         "name": "Sağlık / Engel Raporu",
+        "required_any": ["SAĞLIK KURULU", "ENGELLİLİK", "HEYET RAPORU", "ENGELLİLİK ORANI", "SAĞLIK KURULU RAPORU"],
         "keywords": [
             "RAPOR", "SAĞLIK KURULU", "ENGELLİLİK", "HASTANE",
             "HEYET RAPORU", "TANI", "HASTALIK", "ENGELLİLİK ORANI",
             "SAĞLIK KURUMU", "DOKTOR", "HEKİM",
         ],
-        "min_hits": 2,
+        "min_hits": 3,
     },
 }
 
@@ -105,10 +113,14 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
 
     text_upper = text.upper()
 
+    # required_any kontrolü: zorunlu anahtar kelimelerden en az biri olmalı
+    required_any = sig.get("required_any", [])
+    has_anchor = not required_any or any(kw in text_upper for kw in required_any)
+
     # Beklenen türe kaç anahtar kelime eşleşti?
     hits = sum(1 for kw in sig["keywords"] if kw in text_upper)
     confidence = round(hits / len(sig["keywords"]), 2)
-    valid = hits >= sig["min_hits"]
+    valid = has_anchor and hits >= sig["min_hits"]
 
     # Başka bir tür mü daha çok eşleşiyor?
     best_other: Optional[str] = None
@@ -124,6 +136,13 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
     if valid:
         message = f"✅ Geçerli {sig['name']} tespit edildi."
         detected = sig["name"]
+    elif not has_anchor:
+        message = (
+            f"❌ Bu belge {sig['name']} değil. "
+            f"{sig['name']} için gerekli temel bilgiler bulunamadı. "
+            f"Lütfen doğru belgeyi yükleyin."
+        )
+        detected = best_other if best_other else None
     elif best_other:
         message = (
             f"❌ Yüklenen dosya '{best_other}' gibi görünüyor. "

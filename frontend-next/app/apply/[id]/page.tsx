@@ -102,9 +102,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
   const [result, setResult]  = useState<Result | null>(null)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [docValidation, setDocValidation] = useState<Record<string, {
-    valid: boolean
+    status: "checking" | "valid" | "invalid" | "unknown"  // unknown = API ulaşılamadı
     message: string
-    checking: boolean
   }>>({})
 
 
@@ -162,7 +161,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       return
     }
     // Anlık doğrulama — backend'e gönder
-    setDocValidation(prev => ({ ...prev, [key]: { valid: false, message: "", checking: true } }))
+    setDocValidation(prev => ({ ...prev, [key]: { status: "checking", message: "" } }))
     try {
       const fd = new FormData()
       fd.append("file", f)
@@ -171,13 +170,24 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
         const data = await res.json()
         setDocValidation(prev => ({
           ...prev,
-          [key]: { valid: data.valid, message: data.message, checking: false },
+          [key]: {
+            status: data.valid ? "valid" : "invalid",
+            message: data.message ?? "",
+          },
         }))
       } else {
-        setDocValidation(prev => ({ ...prev, [key]: { valid: true, message: "", checking: false } }))
+        // API hata döndü — belgeyi geçersiz say, kullanıcı değiştirsin
+        setDocValidation(prev => ({
+          ...prev,
+          [key]: { status: "invalid", message: "❌ Belge doğrulanamadı. Lütfen doğru belgeyi yükleyin." },
+        }))
       }
     } catch {
-      setDocValidation(prev => ({ ...prev, [key]: { valid: true, message: "", checking: false } }))
+      // Ağ hatası / backend uyuyor → unknown, uyar ama engelleme
+      setDocValidation(prev => ({
+        ...prev,
+        [key]: { status: "unknown", message: "⚠️ Doğrulama servisi yanıt vermedi. Belge kabul edildi ancak manuel incelemeye alınacak." },
+      }))
     }
   }
 
@@ -482,18 +492,25 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               )}
 
               {documents.map(docId => {
-                const meta = DOC_LABELS[docId] || { label: docId, icon: "📄" }
-                const file  = files[docId]
-                const dv    = docValidation[docId]
-                const isChecking = dv?.checking
-                const isValid    = dv ? dv.valid : true   // henüz kontrol yok → nötr
-                const borderCls  = !file
-                  ? "border-slate-200"
-                  : isChecking
-                    ? "border-amber-300 bg-amber-50"
-                    : isValid
-                      ? "border-emerald-300 bg-emerald-50"
-                      : "border-red-300 bg-red-50"
+                const meta   = DOC_LABELS[docId] || { label: docId, icon: "📄" }
+                const file   = files[docId]
+                const dv     = docValidation[docId]
+                const status = dv?.status ?? "idle"
+
+                const borderCls = !file ? "border-slate-200"
+                  : status === "checking" ? "border-amber-300 bg-amber-50"
+                  : status === "valid"    ? "border-emerald-300 bg-emerald-50"
+                  : status === "invalid"  ? "border-red-300 bg-red-50"
+                  : status === "unknown"  ? "border-amber-200 bg-amber-50"
+                  : "border-slate-200"
+
+                const fileCls = !file
+                  ? "border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500"
+                  : status === "checking" ? "border-amber-300 text-amber-600"
+                  : status === "valid"    ? "border-emerald-300 text-emerald-600"
+                  : status === "invalid"  ? "border-red-300 text-red-500"
+                  : "border-amber-200 text-amber-600"
+
                 return (
                   <div key={docId} className={`p-4 rounded-xl border-2 transition ${borderCls}`}>
                     <div className="flex items-center justify-between mb-2">
@@ -502,37 +519,33 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                         <span className="text-sm font-semibold text-slate-800">{meta.label}</span>
                       </div>
                       {file && (
-                        isChecking ? (
+                        status === "checking" ? (
                           <span className="flex items-center gap-1 text-xs text-amber-600 font-semibold">
                             <span className="w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
                             Doğrulanıyor…
                           </span>
-                        ) : isValid ? (
+                        ) : status === "valid" ? (
                           <span className="text-xs text-emerald-600 font-semibold">✅ Geçerli</span>
-                        ) : (
+                        ) : status === "invalid" ? (
                           <span className="text-xs text-red-600 font-semibold">❌ Geçersiz</span>
+                        ) : (
+                          <span className="text-xs text-amber-600 font-semibold">⚠️ Doğrulanamadı</span>
                         )
                       )}
                     </div>
                     <label className="block cursor-pointer">
-                      <div className={`border-2 border-dashed rounded-xl p-3 text-center text-xs transition
-                        ${!file
-                          ? "border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500"
-                          : isChecking
-                            ? "border-amber-300 text-amber-600"
-                            : isValid
-                              ? "border-emerald-300 text-emerald-600"
-                              : "border-red-300 text-red-500"
-                        }`}>
+                      <div className={`border-2 border-dashed rounded-xl p-3 text-center text-xs transition ${fileCls}`}>
                         {file ? file.name : "PDF seçmek için tıklayın"}
                       </div>
                       <input type="file" accept=".pdf"
                         onChange={e => setFile(docId, e.target.files?.[0] || null)}
                         className="hidden" />
                     </label>
-                    {/* Doğrulama mesajı */}
-                    {file && !isChecking && dv?.message && (
-                      <p className={`mt-2 text-xs font-medium ${isValid ? "text-emerald-700" : "text-red-600"}`}>
+                    {file && status !== "checking" && dv?.message && (
+                      <p className={`mt-2 text-xs font-medium leading-snug
+                        ${status === "valid" ? "text-emerald-700"
+                        : status === "invalid" ? "text-red-600"
+                        : "text-amber-700"}`}>
                         {dv.message}
                       </p>
                     )}
@@ -542,7 +555,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             </div>
 
             {/* Geçersiz belge uyarısı — gönderimi engeller */}
-            {Object.values(docValidation).some(v => !v.checking && !v.valid) && (
+            {Object.values(docValidation).some(v => v.status === "invalid") && (
               <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-sm text-red-700 space-y-1">
                 <p className="font-bold">❌ Geçersiz belge tespit edildi</p>
                 <p>Lütfen kırmızı işaretli belgeleri kaldırıp doğru belgeyi yükleyin. Yanlış belgeyle başvuru gönderilemez.</p>
@@ -555,8 +568,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                 onClick={handleSubmit}
                 disabled={
                   loading ||
-                  Object.values(docValidation).some(v => v.checking) ||
-                  Object.values(docValidation).some(v => !v.checking && !v.valid)
+                  Object.values(docValidation).some(v => v.status === "checking") ||
+                  Object.values(docValidation).some(v => v.status === "invalid")
                 }
                 className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -565,7 +578,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                     <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Analiz ediliyor…
                   </span>
-                ) : Object.values(docValidation).some(v => v.checking)
+                ) : Object.values(docValidation).some(v => v.status === "checking")
                   ? "Belgeler kontrol ediliyor…"
                   : "Başvuruyu Gönder →"}
               </button>
