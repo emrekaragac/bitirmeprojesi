@@ -125,6 +125,7 @@ export default function SetupPage() {
   const [qPhase, setQPhase] = useState<0 | 1>(0)
   const [loading, setLoading] = useState(false)
   const [createdId, setCreatedId] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   // Manuel soru oluşturma state'i
   const [customForm, setCustomForm] = useState({
@@ -255,9 +256,19 @@ export default function SetupPage() {
           Scholarship ID: <span className="font-bold text-slate-700">{createdId}</span>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/apply/${createdId}`)}
-            className="flex-1 rounded-xl bg-indigo-600 text-white font-semibold py-3 text-sm">
-            📋 Copy Link
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/apply/${createdId}`)
+              setLinkCopied(true)
+              setTimeout(() => setLinkCopied(false), 2500)
+            }}
+            className={`flex-1 rounded-xl font-semibold py-3 text-sm transition-all duration-300 ${
+              linkCopied
+                ? "bg-emerald-500 text-white scale-95 shadow-lg shadow-emerald-200"
+                : "bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95"
+            }`}
+          >
+            {linkCopied ? "✅ Kopyalandı!" : "📋 Copy Link"}
           </button>
           <a href="/admin" className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm text-center">Admin →</a>
         </div>
