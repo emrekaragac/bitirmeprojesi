@@ -64,6 +64,61 @@ const LANG_OPTIONS = [
   { val: "C2", label: "C2 – Proficient" },
 ]
 
+// ── KVKK Metni ──────────────────────────────────────────────
+const KVKK_TEXT = `PSDS — Açık Rıza Beyanı
+
+Veri Sorumlusu: Parametrik Burs Dağıtım Sistemi (PSDS)
+Kapsam: Burs başvurusu kapsamında işlenecek tüm kişisel veriler
+Dayanak: 6698 Sayılı Kişisel Verilerin Korunması Kanunu (KVKK)
+
+1. İŞLENECEK KİŞİSEL VERİLER
+
+a) Kimlik ve İletişim Bilgileri
+Ad, soyad, doğum tarihi, e-posta adresi, telefon numarası, ikamet adresi.
+
+b) Finansal Veriler
+Hane halkı gelir düzeyi, taşınmaz mülkiyet bilgisi, araç mülkiyeti, borç yükümlülükleri, aile fertleri sayısı ve gelir durumları. Beyan ettiğiniz araç ve/veya taşınmaz bilgileri (marka, model, yıl, konum gibi özellikler), piyasa değeri tahmini amacıyla kamuya açık Türk ilan platformlarından (arabam.com, hepsiemlak.com, sahibinden.com) toplanan güncel fiyat verileriyle birlikte işlenmektedir.
+
+c) Akademik Veriler
+Not ortalaması (GPA), öğrenci belgesi, burs ve başarı belgeleri, dil sertifikaları, araştırma faaliyetleri.
+
+d) Liderlik ve Sosyal Etki Verileri
+Dernek/kulüp üyelikleri, gönüllülük faaliyetleri, girişimcilik deneyimi.
+
+e) Yüklenen Belgeler — OCR ile İşlenen Veriler
+Yüklenen belgeler pdfplumber ve pytesseract kütüphaneleri kullanılarak optik karakter tanıma (OCR) işlemine tabi tutulmaktadır. Elde edilen veriler, formda beyan ettiğiniz bilgilerle çapraz doğrulama amacıyla kullanılmakta; her başvuru için 0–100 arasında bir güven puanı hesaplanmaktadır.
+
+2. VERİLERİN İŞLENME AMAÇLARI
+
+• Burs başvurusunun alınması, değerlendirilmesi ve sonuçlandırılması
+• Beyan edilen finansal varlıkların güncel piyasa verileriyle doğrulanması
+• Yüklenen belgeler ile form beyanlarının tutarlılığının denetlenmesi
+• Burs programına özgü ağırlıklı puanlama formülüne göre başvurunun puanlanması
+• Sistem yöneticileri tarafından aday sıralamasının görüntülenmesi
+
+3. VERİLERİN AKTARILACAĞI TARAFLAR
+
+Sistem Yönetimi: Başvurunuz ve puan dökümünüz yalnızca PSDS sistem yöneticileri tarafından görüntülenebilir. Verileriniz herhangi bir burs sağlayıcısı, vakıf veya üçüncü taraf kurumla paylaşılmamaktadır.
+
+Anthropic Inc. — Yurt Dışı Aktarım (KVKK Madde 9): Finansal varlık değerleme sürecinde, beyan ettiğiniz araç veya taşınmaz özellikleri (marka, model, yıl, konum gibi) kamuya açık piyasa verileriyle birlikte Anthropic Inc. tarafından işletilen yapay zeka API'sine (Claude) iletilmektedir. Anthropic Inc. Amerika Birleşik Devletleri'nde yerleşik bir şirkettir; bu iletim KVKK'nın 9. maddesi kapsamında yurt dışına kişisel veri aktarımı niteliği taşımaktadır. Söz konusu aktarım yalnızca piyasa değeri tahmini amacıyla gerçekleştirilmekte olup adınız, kimlik numaranız ve iletişim bilgileriniz bu aktarıma dahil edilmemektedir.
+
+Altyapı Hizmet Sağlayıcıları: Vercel (frontend barındırma) ve Render (backend barındırma) platformları teknik veri işleyici konumundadır; kişisel verilerinize bağımsız olarak erişemezler.
+
+4. SAKLAMA SÜRESİ
+
+Kişisel verileriniz, burs değerlendirme sürecinin tamamlanmasından itibaren ilgili mevzuatta öngörülen süreler boyunca saklanacak; akabinde güvenli biçimde silinecek veya anonimleştirilecektir.
+
+5. KVKK KAPSAMINDAKİ HAKLARINIZ
+
+KVKK'nın 11. maddesi uyarınca: kişisel verilerinizin işlenip işlenmediğini öğrenme, işlenen verileriniz hakkında bilgi talep etme, verilerin işlenme amacını öğrenme, yurt içinde veya yurt dışında aktarıldığı üçüncü kişileri öğrenme, eksik veya yanlış işlenmiş verilerin düzeltilmesini isteme, KVKK'nın 7. maddesi çerçevesinde silinmesini ya da yok edilmesini isteme, otomatik sistemler aracılığıyla aleyhinize sonuç doğuran işlemlere itiraz etme ve kanuna aykırı işleme nedeniyle uğradığınız zararın giderilmesini talep etme haklarına sahipsiniz.
+
+6. RIZANIN GERİ ALINMASI
+
+Açık rızanızı dilediğiniz zaman geri alabilirsiniz. Geri alma, önceki veri işleme faaliyetlerinin hukukiliğini etkilemez.
+
+PSDS — Kadir Has Üniversitesi, Yönetim Bilişim Sistemleri, 2025–2026
+Sude Yerekonmaz · Nora Mardikyan · Emre Karagac · Beyzanur Pala`
+
 const DOC_LABELS: Record<string, { label: string; icon: string }> = {
   car_file:            { label: "Vehicle Registration (Ruhsat)", icon: "🚗" },
   house_file:          { label: "Title Deed (Tapu)",             icon: "🏠" },
@@ -101,6 +156,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
   const [loading, setLoading] = useState(false)
   const [result, setResult]  = useState<Result | null>(null)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [kvkkAccepted, setKvkkAccepted] = useState(false)
+  const [kvkkOpen, setKvkkOpen] = useState(false)
   const [docValidation, setDocValidation] = useState<Record<string, {
     status: "checking" | "valid" | "invalid" | "unknown"  // unknown = API ulaşılamadı
     message: string
@@ -363,10 +420,51 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               </div>
             </div>
 
+            {/* KVKK Açık Rıza */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-700 text-sm flex items-center gap-2">
+                  <span>🔒</span> Kişisel Verilerin Korunması (KVKK)
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setKvkkOpen(v => !v)}
+                  className="text-xs text-indigo-600 font-semibold hover:underline"
+                >
+                  {kvkkOpen ? "Gizle ▲" : "Metni Oku ▼"}
+                </button>
+              </div>
+
+              {kvkkOpen && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 max-h-64 overflow-y-auto text-xs text-slate-600 leading-relaxed whitespace-pre-wrap font-mono">
+                  {KVKK_TEXT}
+                </div>
+              )}
+
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={kvkkAccepted}
+                  onChange={e => setKvkkAccepted(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
+                />
+                <span className="text-xs text-slate-600 leading-snug">
+                  Yukarıdaki bilgilendirmeyi okuduğumu ve anladığımı; kişisel verilerimin açıklanan amaçlar ve kapsam dahilinde işlenmesine,{" "}
+                  <span className="font-semibold">Anthropic Inc.'e yurt dışı aktarım dahil olmak üzere</span>, özgür irademle rıza verdiğimi beyan ederim.
+                </span>
+              </label>
+
+              {!kvkkAccepted && (
+                <p className="text-xs text-amber-600 font-medium">
+                  ⚠️ Devam edebilmek için KVKK aydınlatma metnini onaylamanız gerekmektedir.
+                </p>
+              )}
+            </div>
+
             <button
               onClick={() => goStep(1)}
-              disabled={!values.first_name || !values.last_name}
-              className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 disabled:opacity-50"
+              disabled={!values.first_name || !values.last_name || !kvkkAccepted}
+              className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next →
             </button>
