@@ -70,16 +70,28 @@ async def validate_doc_endpoint(
     """
     import tempfile
     suffix = os.path.splitext(file.filename or "doc")[1] or ".pdf"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
+    tmp_path = None
     try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
         result = validate_document(tmp_path, doc_type)
+    except Exception as exc:
+        # Backend hatası → geçersiz say, 500 yerine 200 döndür
+        result = {
+            "valid": False,
+            "expected_name": doc_type,
+            "detected_name": None,
+            "message": f"❌ Belge işlenirken hata oluştu: {str(exc)[:120]}",
+            "confidence": 0.0,
+            "hits": 0,
+        }
     finally:
-        try:
-            os.remove(tmp_path)
-        except Exception:
-            pass
+        if tmp_path:
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
     return result
 
 

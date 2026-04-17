@@ -167,17 +167,54 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
 
 
 def _extract_text_from_pdf(file_path: str) -> str:
+    """PDF'ten metin çıkar. Önce pdfplumber (metin tabanlı),
+    yeterince metin yoksa PyMuPDF + tesseract ile OCR (görüntü tabanlı PDF)."""
+    text = ""
+
+    # 1. Katman: pdfplumber — seçilebilir metin (hızlı)
     try:
         import pdfplumber
         with pdfplumber.open(file_path) as pdf:
-            text = ""
             for page in pdf.pages:
                 t = page.extract_text()
                 if t:
                     text += t + "\n"
-        return text
     except Exception:
-        return ""
+        pass
+
+    # Yeterli metin varsa bitir
+    if len(text.strip()) >= 80:
+        return text
+
+    # 2. Katman: PyMuPDF → PIL Image → pytesseract OCR
+    # (fotoğraf PDF'leri veya taranmış belgeler için)
+    try:
+        import fitz  # PyMuPDF
+        import pytesseract
+        from PIL import Image
+        import io
+
+        doc = fitz.open(file_path)
+        ocr_text = ""
+        for page in doc:
+            # 200 DPI kalitesinde render et
+            mat = fitz.Matrix(200 / 72, 200 / 72)
+            pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB)
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            try:
+                t = pytesseract.image_to_string(img, lang="tur+eng")
+            except Exception:
+                t = pytesseract.image_to_string(img, lang="eng")
+            if t:
+                ocr_text += t + "\n"
+        doc.close()
+
+        if len(ocr_text.strip()) > len(text.strip()):
+            return ocr_text
+    except Exception:
+        pass
+
+    return text
 
 
 def _extract_text_from_image(file_path: str) -> str:
