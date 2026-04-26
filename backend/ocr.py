@@ -81,6 +81,11 @@ DOC_SIGNATURES: dict = {
 def validate_document(file_path: str, expected_doc_id: str) -> dict:
     """
     Yüklenen dosyanın beklenen belge türüne uygun olup olmadığını kontrol eder.
+
+    Strateji:
+      1. pdfplumber ile metin çıkar → anahtar kelime eşleştir (hızlı, tesseract gerekmez)
+      2. Metin yoksa veya kısaysa → Claude Vision ile görsel analiz (fotoğraf PDF'leri için)
+
     Döndürür: {valid, expected_name, detected_name, message, confidence, hits}
     """
     sig = DOC_SIGNATURES.get(expected_doc_id)
@@ -96,74 +101,109 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
         }
 
     text = extract_text(file_path)
+    text_is_short = not text or len(text.strip()) < 80
 
-    # PDF okunamıyor veya çok kısa — geçersiz say
-    if not text or len(text.strip()) < 50:
+    # ── Yeterli metin varsa → anahtar kelime tabanlı doğrulama ──────────────
+    if not text_is_short:
+        text_upper = text.upper()
+        required_any = sig.get("required_any", [])
+        has_anchor = not required_any or any(kw in text_upper for kw in required_any)
+        hits = sum(1 for kw in sig["keywords"] if kw in text_upper)
+        confidence = round(hits / len(sig["keywords"]), 2)
+        valid = has_anchor and hits >= sig["min_hits"]
+
+        best_other: Optional[str] = None
+        best_other_hits = 0
+        for doc_id, other_sig in DOC_SIGNATURES.items():
+            if doc_id == expected_doc_id:
+                continue
+            other_hits = sum(1 for kw in other_sig["keywords"] if kw in text_upper)
+            if other_hits >= other_sig["min_hits"] and other_hits > best_other_hits:
+                best_other_hits = other_hits
+                best_other = other_sig["name"]
+
+        if valid:
+            message = f"✅ Geçerli {sig['name']} tespit edildi."
+            detected = sig["name"]
+        elif not has_anchor:
+            message = (
+                f"❌ Bu belge {sig['name']} değil. "
+                f"{sig['name']} için gerekli temel bilgiler bulunamadı. "
+                f"Lütfen doğru belgeyi yükleyin."
+            )
+            detected = best_other if best_other else None
+        elif best_other:
+            message = (
+                f"❌ Yüklenen dosya '{best_other}' gibi görünüyor. "
+                f"Bu alana lütfen geçerli bir {sig['name']} yükleyin."
+            )
+            detected = best_other
+        else:
+            message = (
+                f"❌ Bu PDF'in {sig['name']} olduğu doğrulanamadı. "
+                f"Lütfen doğru belgeyi yükleyin."
+            )
+            detected = None
+
+        return {
+            "valid": valid,
+            "expected_name": sig["name"],
+            "detected_name": detected,
+            "message": message,
+            "confidence": confidence,
+            "hits": hits,
+        }
+
+    # ── Metin çıkarılamadı → Claude Vision ile görsel analiz ─────────────────
+    # (fotoğraf PDF'leri, taranmış belgeler)
+    try:
+        from backend.claude_vision import (
+            analyze_car_document,
+            analyze_house_document,
+            analyze_generic_document,
+        )
+        if expected_doc_id == "car_file":
+            result = analyze_car_document(file_path)
+        elif expected_doc_id == "house_file":
+            result = analyze_house_document(file_path)
+        else:
+            result = analyze_generic_document(file_path, expected_doc_id)
+
+        valid = result.get("valid")
+        # valid=None → Vision yanıt vermedi → unknown (uyar ama engelleme)
+        if valid is None:
+            return {
+                "valid": False,  # frontend'e valid=False → unknown status için
+                "expected_name": sig["name"],
+                "detected_name": None,
+                "message": result.get("message", "⚠️ Doğrulama servisi yanıt vermedi."),
+                "confidence": 0.0,
+                "hits": 0,
+                "vision_used": True,
+                "vision_unavailable": True,
+            }
+        return {
+            "valid": valid,
+            "expected_name": sig["name"],
+            "detected_name": sig["name"] if valid else None,
+            "message": result.get("message", ""),
+            "confidence": result.get("confidence", 0.5),
+            "hits": 0,
+            "vision_used": True,
+            "vision_extracted": result.get("extracted", {}),
+        }
+    except Exception as e:
         return {
             "valid": False,
             "expected_name": sig["name"],
             "detected_name": None,
             "message": (
-                f"❌ Belge okunamadı veya boş. "
-                f"Lütfen metin içeren geçerli bir {sig['name']} PDF'i yükleyin."
+                f"❌ Belge okunamadı (görsel analiz hatası: {str(e)[:80]}). "
+                f"Lütfen geçerli bir {sig['name']} PDF'i yükleyin."
             ),
             "confidence": 0.0,
             "hits": 0,
         }
-
-    text_upper = text.upper()
-
-    # required_any kontrolü: zorunlu anahtar kelimelerden en az biri olmalı
-    required_any = sig.get("required_any", [])
-    has_anchor = not required_any or any(kw in text_upper for kw in required_any)
-
-    # Beklenen türe kaç anahtar kelime eşleşti?
-    hits = sum(1 for kw in sig["keywords"] if kw in text_upper)
-    confidence = round(hits / len(sig["keywords"]), 2)
-    valid = has_anchor and hits >= sig["min_hits"]
-
-    # Başka bir tür mü daha çok eşleşiyor?
-    best_other: Optional[str] = None
-    best_other_hits = 0
-    for doc_id, other_sig in DOC_SIGNATURES.items():
-        if doc_id == expected_doc_id:
-            continue
-        other_hits = sum(1 for kw in other_sig["keywords"] if kw in text_upper)
-        if other_hits >= other_sig["min_hits"] and other_hits > best_other_hits:
-            best_other_hits = other_hits
-            best_other = other_sig["name"]
-
-    if valid:
-        message = f"✅ Geçerli {sig['name']} tespit edildi."
-        detected = sig["name"]
-    elif not has_anchor:
-        message = (
-            f"❌ Bu belge {sig['name']} değil. "
-            f"{sig['name']} için gerekli temel bilgiler bulunamadı. "
-            f"Lütfen doğru belgeyi yükleyin."
-        )
-        detected = best_other if best_other else None
-    elif best_other:
-        message = (
-            f"❌ Yüklenen dosya '{best_other}' gibi görünüyor. "
-            f"Bu alana lütfen geçerli bir {sig['name']} yükleyin."
-        )
-        detected = best_other
-    else:
-        message = (
-            f"❌ Bu PDF'in {sig['name']} olduğu doğrulanamadı. "
-            f"Lütfen doğru belgeyi yükleyin."
-        )
-        detected = None
-
-    return {
-        "valid": valid,
-        "expected_name": sig["name"],
-        "detected_name": detected,
-        "message": message,
-        "confidence": confidence,
-        "hits": hits,
-    }
 
 
 def _extract_text_from_pdf(file_path: str) -> str:
