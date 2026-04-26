@@ -255,6 +255,7 @@ def parse_ruhsat(file_path: str) -> dict:
         "motor_hacmi": None,
         "yakit_tipi": None,
         "sahip_adi": None,
+        "raw_text": text[:2000] if text else "",   # Claude'a verilecek ham metin
         "ocr_success": bool(text and len(text) > 20),
     }
 
@@ -327,6 +328,7 @@ def parse_tapu(file_path: str) -> dict:
         "yuzolcumu": None,
         "nitelik": None,
         "malik": None,
+        "raw_text": text[:2000] if text else "",   # Claude'a verilecek ham metin
         "ocr_success": bool(text and len(text) > 20),
     }
 

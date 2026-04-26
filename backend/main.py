@@ -254,15 +254,19 @@ async def scholarship_apply(
             buf.write(await income_file.read())
         saved_files["income_file"] = i_path
 
-    # Valuations
+    # Valuations — Hoca akışı: Belge OCR → bilgi çıkar → Claude'a gönder → değer
     estimated_car_value = None
     car_rag_used = False
     car_confidence = None
     car_reasoning = None
     if has_car == "yes" and car_brand and car_year:
         try:
-            res = rag_estimate_car(brand=car_brand, model=car_model,
-                                   year=int(car_year), has_damage=(car_damage == "yes"))
+            car_ocr_text = ruhsat_data.get("raw_text", "") if ruhsat_data else ""
+            res = rag_estimate_car(
+                brand=car_brand, model=car_model,
+                year=int(car_year), has_damage=(car_damage == "yes"),
+                ocr_text=car_ocr_text,
+            )
             estimated_car_value = res.get("estimated_car_value")
             car_rag_used = res.get("rag_used", False)
             car_confidence = res.get("confidence")
@@ -277,7 +281,12 @@ async def scholarship_apply(
     property_reasoning = None
     if has_house == "yes" and city and square_meters:
         try:
-            val = rag_estimate_property(city=city, district=district, square_meters=float(square_meters))
+            house_ocr_text = tapu_data.get("raw_text", "") if tapu_data else ""
+            val = rag_estimate_property(
+                city=city, district=district,
+                square_meters=float(square_meters),
+                ocr_text=house_ocr_text,
+            )
             property_estimated_value = val.get("property_estimated_value")
             avg_m2_price = val.get("avg_m2_price")
             property_rag_used = val.get("rag_used", False)
@@ -492,8 +501,12 @@ async def analyze(
     car_reasoning = None
     if has_car == "yes" and car_brand and car_year:
         try:
-            res = rag_estimate_car(brand=car_brand, model=car_model,
-                                   year=int(car_year), has_damage=(car_damage == "yes"))
+            car_ocr_text = ruhsat_data.get("raw_text", "") if ruhsat_data else ""
+            res = rag_estimate_car(
+                brand=car_brand, model=car_model,
+                year=int(car_year), has_damage=(car_damage == "yes"),
+                ocr_text=car_ocr_text,
+            )
             estimated_car_value = res.get("estimated_car_value")
             car_rag_used = res.get("rag_used", False)
             car_confidence = res.get("confidence")
@@ -508,7 +521,12 @@ async def analyze(
     property_reasoning = None
     if has_house == "yes" and city and square_meters:
         try:
-            val = rag_estimate_property(city=city, district=district, square_meters=float(square_meters))
+            house_ocr_text = tapu_data.get("raw_text", "") if tapu_data else ""
+            val = rag_estimate_property(
+                city=city, district=district,
+                square_meters=float(square_meters),
+                ocr_text=house_ocr_text,
+            )
             property_estimated_value = val.get("property_estimated_value")
             avg_m2_price = val.get("avg_m2_price")
             property_rag_used = val.get("rag_used", False)
