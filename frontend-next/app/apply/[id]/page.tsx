@@ -233,10 +233,10 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
           },
         }))
       } else {
-        // API hata döndü — belgeyi geçersiz say, kullanıcı değiştirsin
+        // API hata / 500 → bloke ETME, uyarıyla kabul et
         setDocValidation(prev => ({
           ...prev,
-          [key]: { status: "invalid", message: "❌ Belge doğrulanamadı. Lütfen doğru belgeyi yükleyin." },
+          [key]: { status: "unknown", message: "⚠️ Doğrulama servisi yanıt vermedi. Belge kabul edildi, manuel incelemeye alınacak." },
         }))
       }
     } catch {
