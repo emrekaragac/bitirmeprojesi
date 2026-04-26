@@ -120,7 +120,7 @@ def analyze_car_document(file_path: str) -> dict:
     """
     images_b64 = file_to_base64_images(file_path, max_pages=1)
     if not images_b64:
-        return _car_fallback(valid=False, msg="❌ Belge görüntüye dönüştürülemedi.")
+        return _car_fallback(valid=None, msg="⚠️ Belge görüntüye dönüştürülemedi, manuel incelemeye alınacak.")
 
     prompt = """Bu belgeyi incele ve aşağıdaki JSON formatında yanıt ver. Başka metin yazma.
 
@@ -205,7 +205,7 @@ def analyze_house_document(file_path: str) -> dict:
     """
     images_b64 = file_to_base64_images(file_path, max_pages=1)
     if not images_b64:
-        return _house_fallback(valid=False, msg="❌ Belge görüntüye dönüştürülemedi.")
+        return _house_fallback(valid=None, msg="⚠️ Belge görüntüye dönüştürülemedi, manuel incelemeye alınacak.")
 
     prompt = """Bu belgeyi incele ve aşağıdaki JSON formatında yanıt ver. Başka metin yazma.
 

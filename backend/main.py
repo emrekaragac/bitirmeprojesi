@@ -108,12 +108,12 @@ async def validate_doc_endpoint(
             tmp_path = tmp.name
         result = validate_document(tmp_path, doc_type)
     except Exception as exc:
-        # Backend hatası → geçersiz say, 500 yerine 200 döndür
+        # Backend hatası → bloke ETME, uyarıyla kabul et
         result = {
-            "valid": False,
+            "valid": True,
             "expected_name": doc_type,
             "detected_name": None,
-            "message": f"❌ Belge işlenirken hata oluştu: {str(exc)[:120]}",
+            "message": f"⚠️ Doğrulama sırasında hata oluştu. Belge manuel incelemeye alınacak. ({str(exc)[:80]})",
             "confidence": 0.0,
             "hits": 0,
         }

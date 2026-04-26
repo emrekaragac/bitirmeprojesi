@@ -6,12 +6,19 @@ from typing import Optional
 DOC_SIGNATURES: dict = {
     "car_file": {
         "name": "Araç Ruhsatı",
-        # required_any: en az biri ZORUNLU — belgede kesinlikle bu kelimelerden biri olmalı
-        "required_any": ["RUHSAT", "TRAFİK TESCİL", "MOTORLU TAŞIT", "ŞASI NO", "ŞASI NUMARASI", "MOTOR NO"],
+        # required_any: belgede kesinlikle bunlardan biri olmalı
+        # Gerçek ruhsattan kontrol edildi: ŞASE NO (ŞASİ değil!), PLAKA, MOTOR NO
+        "required_any": [
+            "PLAKA", "ŞASE NO", "ŞASE NUMARASI", "ŞASI NO", "MOTOR NO",
+            "TESCİL SIRA NO", "MODEL YILI", "TRAFİK TESCİL", "RUHSAT",
+        ],
         "keywords": [
-            "RUHSAT", "TESCİL", "PLAKA", "ARAÇ", "ŞASI NO", "ŞASI NUMARASI",
-            "MOTOR NO", "MOTOR NUMARASI", "TRAFİK TESCİL", "MOTORLU TAŞIT",
-            "CİNS", "MARKA", "TİP", "RENK", "MODEL YILI",
+            # Gerçek ruhsat alanları (PHOTO-2026... belgesiyle doğrulandı)
+            "PLAKA", "MARKASI", "MARKA", "TESCİL", "MODEL YILI",
+            "ŞASE NO", "ŞASE NUMARASI", "ŞASI NO",  # her iki yazım
+            "MOTOR NO", "SİLİNDİR HACMİ", "MOTOR GÜCÜ",
+            "YAKIT CİNSİ", "RENK", "CİNS", "TİP", "ARAÇ SINIFI",
+            "TESCİL SIRA NO", "KULLANIM AMACI", "NET AĞIRLIĞI",
         ],
         "min_hits": 3,
     },
@@ -170,13 +177,13 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             result = analyze_generic_document(file_path, expected_doc_id)
 
         valid = result.get("valid")
-        # valid=None → Vision yanıt vermedi → unknown (uyar ama engelleme)
+        # valid=None → Vision ulaşılamadı/hata → engelleme YOK, uyarıyla kabul et
         if valid is None:
             return {
-                "valid": False,  # frontend'e valid=False → unknown status için
+                "valid": True,          # bloke etme — manuel incelemeye al
                 "expected_name": sig["name"],
                 "detected_name": None,
-                "message": result.get("message", "⚠️ Doğrulama servisi yanıt vermedi."),
+                "message": "⚠️ Görsel doğrulama servisi yanıt vermedi. Belge kabul edildi, manuel incelemeye alınacak.",
                 "confidence": 0.0,
                 "hits": 0,
                 "vision_used": True,
@@ -193,16 +200,15 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             "vision_extracted": result.get("extracted", {}),
         }
     except Exception as e:
+        # Herhangi bir hata → bloke etme, uyarıyla kabul et
         return {
-            "valid": False,
+            "valid": True,
             "expected_name": sig["name"],
             "detected_name": None,
-            "message": (
-                f"❌ Belge okunamadı (görsel analiz hatası: {str(e)[:80]}). "
-                f"Lütfen geçerli bir {sig['name']} PDF'i yükleyin."
-            ),
+            "message": f"⚠️ Görsel analiz başarısız ({str(e)[:60]}). Belge manuel incelemeye alınacak.",
             "confidence": 0.0,
             "hits": 0,
+            "vision_unavailable": True,
         }
 
 
