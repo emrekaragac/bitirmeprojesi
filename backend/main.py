@@ -56,6 +56,36 @@ def root():
 
 
 # ─────────────────────────────────────────────────────────────
+# DEBUG — belge metin çıkarma testi
+# ─────────────────────────────────────────────────────────────
+
+@app.post("/debug-document")
+async def debug_document(file: UploadFile = File(...)):
+    """Belgeden çıkarılan ham metni döndürür — keyword sorunlarını teşhis için."""
+    import tempfile
+    from backend.ocr import extract_text
+    tmp_path = None
+    try:
+        suffix = os.path.splitext(file.filename or "doc")[1] or ".pdf"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
+        text = extract_text(tmp_path)
+        text_upper = text.upper() if text else ""
+        return {
+            "filename": file.filename,
+            "char_count": len(text) if text else 0,
+            "text_preview": text[:1500] if text else "",
+            "text_upper_preview": text_upper[:1500],
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
+    finally:
+        if tmp_path:
+            try: os.remove(tmp_path)
+            except: pass
+
+# ─────────────────────────────────────────────────────────────
 # DOCUMENT VALIDATION  — anlık belge doğrulama
 # ─────────────────────────────────────────────────────────────
 
