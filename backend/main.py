@@ -56,6 +56,53 @@ def root():
 
 
 # ─────────────────────────────────────────────────────────────
+# DEBUG — sistem bileşenlerini test et
+# ─────────────────────────────────────────────────────────────
+
+@app.get("/debug-system")
+def debug_system():
+    """PyMuPDF ve Anthropic API bağlantısını test eder."""
+    result = {}
+
+    # PyMuPDF
+    try:
+        import fitz
+        result["pymupdf"] = f"✅ {fitz.__version__}"
+    except Exception as e:
+        result["pymupdf"] = f"❌ {e}"
+
+    # Anthropic API key
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    result["api_key"] = f"✅ set ({len(api_key)} chars)" if api_key else "❌ not set"
+
+    # Anthropic API bağlantısı
+    try:
+        import anthropic
+        resp = anthropic.Anthropic(api_key=api_key).messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=10,
+            messages=[{"role": "user", "content": "ping"}],
+        )
+        result["anthropic_api"] = f"✅ OK ({resp.model})"
+    except Exception as e:
+        result["anthropic_api"] = f"❌ {str(e)[:120]}"
+
+    # web_search tool testi
+    try:
+        import anthropic
+        resp2 = anthropic.Anthropic(api_key=api_key).messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=50,
+            tools=[{"type": "web_search_20250305", "name": "web_search"}],
+            messages=[{"role": "user", "content": "test"}],
+        )
+        result["web_search_tool"] = "✅ available"
+    except Exception as e:
+        result["web_search_tool"] = f"❌ {str(e)[:120]}"
+
+    return result
+
+# ─────────────────────────────────────────────────────────────
 # DEBUG — belge metin çıkarma testi
 # ─────────────────────────────────────────────────────────────
 
