@@ -119,6 +119,37 @@ Açık rızanızı dilediğiniz zaman geri alabilirsiniz. Geri alma, önceki ver
 PSDS — Kadir Has Üniversitesi, Yönetim Bilişim Sistemleri, 2025–2026
 Sude Yerekonmaz · Nora Mardikyan · Emre Karagac · Beyzanur Pala`
 
+const CAR_BRANDS: Record<string, string[]> = {
+  "Toyota":       ["Corolla", "Yaris", "Camry", "C-HR", "RAV4", "Land Cruiser", "Hilux", "Auris", "Prius", "Verso"],
+  "Volkswagen":   ["Polo", "Golf", "Passat", "Tiguan", "T-Roc", "T-Cross", "Caddy", "Transporter", "Arteon"],
+  "Renault":      ["Clio", "Megane", "Symbol", "Fluence", "Kadjar", "Captur", "Duster", "Taliant", "Zoe", "Talisman"],
+  "Fiat":         ["Egea", "500", "Doblo", "Panda", "Tipo", "Fiorino", "Ducato"],
+  "Ford":         ["Fiesta", "Focus", "Mondeo", "Kuga", "EcoSport", "Puma", "Ranger", "Transit", "Transit Connect"],
+  "Hyundai":      ["i10", "i20", "i30", "Elantra", "Tucson", "Santa Fe", "Kona", "Bayon"],
+  "Kia":          ["Picanto", "Rio", "Ceed", "Sportage", "Sorento", "Stonic", "Niro"],
+  "BMW":          ["1 Serisi", "2 Serisi", "3 Serisi", "4 Serisi", "5 Serisi", "7 Serisi", "X1", "X2", "X3", "X5", "X6"],
+  "Mercedes-Benz":["A Serisi", "B Serisi", "C Serisi", "E Serisi", "S Serisi", "GLA", "GLB", "GLC", "GLE", "GLS", "Vito"],
+  "Audi":         ["A1", "A3", "A4", "A5", "A6", "A7", "A8", "Q2", "Q3", "Q5", "Q7", "Q8"],
+  "Opel":         ["Corsa", "Astra", "Insignia", "Mokka", "Crossland", "Grandland", "Combo"],
+  "Peugeot":      ["108", "208", "308", "408", "508", "2008", "3008", "5008", "Partner", "Expert"],
+  "Citroen":      ["C1", "C3", "C4", "C5 Aircross", "Berlingo", "Jumpy"],
+  "Dacia":        ["Sandero", "Logan", "Duster", "Jogger", "Spring", "Dokker"],
+  "SEAT":         ["Ibiza", "Leon", "Arona", "Ateca", "Tarraco"],
+  "Skoda":        ["Fabia", "Scala", "Octavia", "Superb", "Kamiq", "Karoq", "Kodiaq"],
+  "Honda":        ["Jazz", "Civic", "Accord", "HR-V", "CR-V"],
+  "Nissan":       ["Micra", "Note", "Juke", "Qashqai", "X-Trail", "Navara"],
+  "Mazda":        ["Mazda2", "Mazda3", "Mazda6", "CX-3", "CX-5", "CX-30"],
+  "Volvo":        ["V40", "V60", "V90", "S60", "S90", "XC40", "XC60", "XC90"],
+  "Mitsubishi":   ["Colt", "Lancer", "Outlander", "Eclipse Cross", "ASX", "L200"],
+  "Suzuki":       ["Alto", "Swift", "Baleno", "Vitara", "S-Cross", "Ignis"],
+  "Subaru":       ["Impreza", "Forester", "Outback", "XV", "Legacy"],
+  "Jeep":         ["Renegade", "Compass", "Cherokee", "Grand Cherokee", "Wrangler"],
+  "Land Rover":   ["Defender", "Discovery", "Discovery Sport", "Range Rover", "Range Rover Sport", "Range Rover Evoque"],
+  "Porsche":      ["911", "718 Boxster", "718 Cayman", "Cayenne", "Macan", "Panamera", "Taycan"],
+  "TOGG":         ["T10X", "T10F"],
+  "Tofaş":        ["Şahin", "Kartal", "Doğan", "Tempra"],
+}
+
 const DOC_LABELS: Record<string, { label: string; icon: string }> = {
   car_file:            { label: "Vehicle Registration (Ruhsat)", icon: "🚗" },
   house_file:          { label: "Title Deed (Tapu)",             icon: "🏠" },
@@ -666,27 +697,43 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                     {/* Manuel giriş — Vision okuyamadığında veya servis erişilemediğinde */}
                     {file && status !== "checking" && status !== "invalid" && (dv?.visionUnavailable || status === "unknown") && docId === "car_file" && (
                       <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
-                        <p className="text-xs font-semibold text-amber-800">Araç bilgilerini manuel girin:</p>
+                        <p className="text-xs font-semibold text-amber-800">Araç bilgilerini girin (fiyat tahmini için):</p>
                         <div className="grid grid-cols-2 gap-2">
-                          <input
+                          {/* Marka */}
+                          <select
                             className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
-                            placeholder="Marka (ör. Toyota)"
                             value={values["car_brand"] || ""}
-                            onChange={e => setValues(p => ({ ...p, car_brand: e.target.value }))}
-                          />
-                          <input
-                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
-                            placeholder="Model (ör. Corolla)"
+                            onChange={e => setValues(p => ({ ...p, car_brand: e.target.value, car_model: "" }))}
+                          >
+                            <option value="">— Marka seçin —</option>
+                            {Object.keys(CAR_BRANDS).sort().map(b => (
+                              <option key={b} value={b}>{b}</option>
+                            ))}
+                          </select>
+                          {/* Model — markaya göre dinamik */}
+                          <select
+                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 disabled:opacity-40"
                             value={values["car_model"] || ""}
+                            disabled={!values["car_brand"]}
                             onChange={e => setValues(p => ({ ...p, car_model: e.target.value }))}
-                          />
-                          <input
+                          >
+                            <option value="">— Model seçin —</option>
+                            {(CAR_BRANDS[values["car_brand"] || ""] || []).map(m => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                          {/* Yıl */}
+                          <select
                             className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
-                            placeholder="Yıl (ör. 2020)"
-                            type="number"
                             value={values["car_year"] || ""}
                             onChange={e => setValues(p => ({ ...p, car_year: e.target.value }))}
-                          />
+                          >
+                            <option value="">— Yıl —</option>
+                            {Array.from({ length: 30 }, (_, i) => 2025 - i).map(y => (
+                              <option key={y} value={y}>{y}</option>
+                            ))}
+                          </select>
+                          {/* Hasar */}
                           <select
                             className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
                             value={values["car_damage"] || "no"}
