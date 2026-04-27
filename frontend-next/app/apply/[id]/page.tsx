@@ -160,8 +160,9 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
   const [kvkkAccepted, setKvkkAccepted] = useState(false)
   const [kvkkOpen, setKvkkOpen] = useState(false)
   const [docValidation, setDocValidation] = useState<Record<string, {
-    status: "checking" | "valid" | "invalid" | "unknown"  // unknown = API ulaşılamadı
+    status: "checking" | "valid" | "invalid" | "unknown"
     message: string
+    visionUnavailable?: boolean   // true → Vision okuyamadı, manuel giriş gerekebilir
   }>>({})
 
 
@@ -225,28 +226,26 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       const res = await fetch(`${API}/validate-document/${key}`, { method: "POST", body: fd })
       if (res.ok) {
         const data = await res.json()
-        // Sadece Vision kesin "hayır" dediyse bloke et.
-        // valid=false ama vision_unavailable=true → teknik sorun, bloke etme.
         const isDefinitelyInvalid = data.valid === false && !data.vision_unavailable
+        const visionUnavailable = !!data.vision_unavailable
         setDocValidation(prev => ({
           ...prev,
           [key]: {
             status: isDefinitelyInvalid ? "invalid" : data.valid ? "valid" : "unknown",
             message: data.message ?? "",
+            visionUnavailable,
           },
         }))
       } else {
-        // HTTP 4xx/5xx → teknik hata, bloke etme
         setDocValidation(prev => ({
           ...prev,
-          [key]: { status: "unknown", message: "⚠️ Doğrulama servisi yanıt vermedi. Belge kabul edildi, manuel incelemeye alınacak." },
+          [key]: { status: "unknown", message: "⚠️ Doğrulama servisi yanıt vermedi. Belge kabul edildi, manuel incelemeye alınacak.", visionUnavailable: true },
         }))
       }
     } catch {
-      // Ağ hatası / backend uyuyor → bloke etme
       setDocValidation(prev => ({
         ...prev,
-        [key]: { status: "unknown", message: "⚠️ Doğrulama servisi yanıt vermedi. Belge kabul edildi ancak manuel incelemeye alınacak." },
+        [key]: { status: "unknown", message: "⚠️ Doğrulama servisi yanıt vermedi. Belge kabul edildi ancak manuel incelemeye alınacak.", visionUnavailable: true },
       }))
     }
   }
@@ -276,6 +275,10 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
         extraFields[q.id] = val
       })
       fd.append("extra_fields", JSON.stringify(extraFields))
+      // Araç/tapu dosyası yüklendiyse has_car/has_house'u zorla "yes" yap
+      // (scholarship'ta bu soru yoksa bile backend değer hesaplasın)
+      if (files["car_file"])   fd.set("has_car",   "yes")
+      if (files["house_file"]) fd.set("has_house", "yes")
       // files
       scholarship.config.documents.forEach(docId => {
         if (files[docId]) fd.append(docId, files[docId])
@@ -660,8 +663,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                       </p>
                     )}
 
-                    {/* Manuel giriş — yalnızca doğrulanamadı durumunda */}
-                    {file && status === "unknown" && docId === "car_file" && (
+                    {/* Manuel giriş — Vision okuyamadığında veya servis erişilemediğinde */}
+                    {file && status !== "checking" && status !== "invalid" && (dv?.visionUnavailable || status === "unknown") && docId === "car_file" && (
                       <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
                         <p className="text-xs font-semibold text-amber-800">Araç bilgilerini manuel girin:</p>
                         <div className="grid grid-cols-2 gap-2">
@@ -696,7 +699,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                       </div>
                     )}
 
-                    {file && status === "unknown" && docId === "house_file" && (
+                    {file && status !== "checking" && status !== "invalid" && (dv?.visionUnavailable || status === "unknown") && docId === "house_file" && (
                       <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
                         <p className="text-xs font-semibold text-amber-800">Tapu bilgilerini manuel girin:</p>
                         <div className="grid grid-cols-2 gap-2">
