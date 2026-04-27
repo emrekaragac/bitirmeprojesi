@@ -15,21 +15,43 @@ import re
 import json
 import datetime
 
-# ── Güncel Türkiye piyasa bağlamı (2024-2025) ────────────────────────────────
+# ── Güncel Türkiye piyasa bağlamı (2025) ─────────────────────────────────────
 MARKET_CONTEXT = """
-Türkiye 2024-2025 araç ve konut piyasası (güncel TL değerleri):
+Türkiye 2025 ikinci el araç piyasası (Nisan 2025 güncel TL değerleri):
 
-ARAÇ FİYATLARI (ikinci el, TL, 2025 başı):
-- Segment B (Fiat Egea, Renault Clio, VW Polo, Dacia Sandero): 900K–1.3M TL (2020 model)
-- Segment C (Toyota Corolla, VW Golf, Honda Civic, Hyundai i30): 1.2M–1.8M TL (2020 model)
-- Segment D (Toyota Camry, VW Passat, BMW 3 Serisi): 1.8M–3.0M TL (2020 model)
-- SUV Orta (Toyota C-HR, Renault Kadjar, Hyundai Tucson): 1.5M–2.3M TL (2020 model)
-- SUV Büyük (Toyota RAV4, BMW X3, Mercedes GLC): 2.5M–4.5M TL (2020 model)
-- Lüks (BMW 5, Mercedes E, Audi A6): 4M–8M TL (2020 model)
-- Her model yılı: ~%12-15 yıllık değer kaybı
-- Hasar kaydı var: %15-25 ek iskonto
+ARAÇ İKİNCİ EL SATIŞ FİYATLARI (yıla göre, TL):
+Segment B — Fiat Egea, Renault Clio, Dacia Sandero, VW Polo:
+  2024 model: 1.100K–1.500K TL
+  2022 model: 950K–1.300K TL
+  2020 model: 800K–1.100K TL
+  2018 model: 650K–900K TL
+  2015 model: 450K–650K TL
 
-KONUT FİYATLARI (m² satış, TL, 2025):
+Segment C — Toyota Corolla, VW Golf, Hyundai i30, Honda Civic, Skoda Octavia:
+  2024 model: 2.000K–2.800K TL
+  2022 model: 1.700K–2.300K TL
+  2020 model: 1.400K–1.900K TL
+  2018 model: 1.100K–1.500K TL
+  2015 model: 750K–1.100K TL
+
+SUV Orta — Toyota C-HR, Hyundai Tucson, Kia Sportage, VW Tiguan:
+  2024 model: 2.500K–3.500K TL
+  2022 model: 2.000K–2.800K TL
+  2020 model: 1.600K–2.300K TL
+  2018 model: 1.200K–1.800K TL
+
+SUV Büyük — Toyota RAV4, BMW X3, Mercedes GLC:
+  2024 model: 3.500K–5.500K TL
+  2022 model: 2.800K–4.500K TL
+  2020 model: 2.200K–3.500K TL
+
+Lüks Sedan — BMW 3/5 Serisi, Mercedes C/E Serisi, Audi A4/A6:
+  2024 model: 4.000K–9.000K TL
+  2022 model: 3.200K–7.000K TL
+  2020 model: 2.500K–5.500K TL
+  2018 model: 1.800K–3.500K TL
+
+KONUT FİYATLARI (m² satış, TL, Nisan 2025):
 - İstanbul Avrupa merkez (Beşiktaş, Şişli, Sarıyer, Bakırköy): 130K–280K TL/m²
 - İstanbul Anadolu merkez (Kadıköy, Üsküdar, Ataşehir): 90K–180K TL/m²
 - İstanbul çevre (Esenyurt, Pendik, Tuzla, Silivri): 45K–90K TL/m²
@@ -60,31 +82,39 @@ _CITY_M2: dict[str, int] = {
     "default":  20_000,
 }
 
-# ── Segment bazlı araç baz fiyatları (fallback, 2020 model baz) ───────────────
+# ── Segment bazlı araç baz fiyatları (fallback) ───────────────────────────────
+# NOT: Bu değerler 2025 SIFIR araç fiyatlarıdır.
+# Amortisman bu fiyat üzerinden yıla göre hesaplanır.
 _BRAND_SEGMENT: dict[str, tuple[int, str]] = {
-    "volkswagen": (1_500_000, "C"),
-    "toyota":     (1_400_000, "C"),
-    "mercedes":   (3_200_000, "Lüks"),
-    "bmw":        (3_000_000, "Lüks"),
-    "audi":       (2_800_000, "Lüks"),
-    "ford":       (1_200_000, "B-C"),
-    "renault":    (1_050_000, "B"),
-    "fiat":       (  950_000, "B"),
-    "opel":       (1_050_000, "B-C"),
-    "hyundai":    (1_300_000, "C"),
-    "kia":        (1_300_000, "C"),
-    "honda":      (1_350_000, "C"),
-    "peugeot":    (1_150_000, "B-C"),
-    "citroen":    (1_050_000, "B"),
-    "skoda":      (1_250_000, "C"),
-    "dacia":      (  900_000, "B"),
-    "seat":       (1_150_000, "B-C"),
-    "volvo":      (2_800_000, "D"),
-    "mitsubishi": (1_400_000, "C"),
-    "nissan":     (1_300_000, "C"),
-    "subaru":     (1_500_000, "C"),
-    "jeep":       (2_000_000, "SUV"),
-    "default":    (1_250_000, "C"),
+    "volkswagen":    (2_800_000, "C"),
+    "toyota":        (2_500_000, "C"),
+    "mercedes":      (7_000_000, "Lüks"),
+    "mercedes-benz": (7_000_000, "Lüks"),
+    "bmw":           (6_000_000, "Lüks"),
+    "audi":          (5_500_000, "Lüks"),
+    "ford":          (2_200_000, "B-C"),
+    "renault":       (1_600_000, "B"),
+    "fiat":          (1_200_000, "B"),
+    "opel":          (1_700_000, "B-C"),
+    "hyundai":       (2_100_000, "C"),
+    "kia":           (2_100_000, "C"),
+    "honda":         (2_400_000, "C"),
+    "peugeot":       (1_900_000, "B-C"),
+    "citroen":       (1_600_000, "B"),
+    "skoda":         (2_000_000, "B-C"),
+    "dacia":         (1_100_000, "B"),
+    "seat":          (1_900_000, "B-C"),
+    "volvo":         (5_000_000, "D"),
+    "mitsubishi":    (2_600_000, "SUV Orta"),
+    "nissan":        (2_200_000, "C-SUV"),
+    "subaru":        (3_200_000, "C-SUV"),
+    "jeep":          (4_500_000, "SUV"),
+    "land rover":    (9_000_000, "SUV Lüks"),
+    "porsche":       (12_000_000, "Spor"),
+    "suzuki":        (1_700_000, "B"),
+    "mazda":         (2_500_000, "C"),
+    "togg":          (1_800_000, "B"),
+    "default":       (2_000_000, "C"),
 }
 
 
@@ -155,10 +185,9 @@ Aşağıdaki araç ruhsatı bilgilerine dayanarak güncel Türkiye ikinci el piy
   Değerleme    : {current_year} yılı Türkiye piyasası
 
 Talimatlar:
-- Piyasa bağlamındaki TL fiyat aralıklarını kullan
-- Araç yaşına göre %12-15/yıl amortisman uygula
-- Hasar varsa ek %15-25 iskonto ekle
-- Varsa belge metninden ek bilgi (motor hacmi, yakıt tipi vb.) değerlemeye kat
+- Yukarıdaki yıl-bazlı fiyat tablosunu kullan, araca en yakın segmenti ve yılı bul
+- İki yıl arası interpolasyon yap (ör. 2019 modeli → 2018 ile 2020 arası)
+- Hasar varsa %15-25 ek iskonto uygula
 - SADECE JSON formatında yanıt ver, başka metin yazma
 
 {{
@@ -182,14 +211,14 @@ Talimatlar:
                     "live_data": False,
                 }
 
-    # Fallback: istatistiksel formül
+    # Fallback: istatistiksel formül (2025 sıfır fiyatından amortisman)
     brand_lower = (brand or "").lower()
-    base_2020, segment = _BRAND_SEGMENT.get(brand_lower, _BRAND_SEGMENT["default"])
-    depreciation = max(0.20, (1 - 0.12) ** age)
-    value = round(base_2020 * depreciation * (0.80 if has_damage else 1.0))
+    base_new, segment = _BRAND_SEGMENT.get(brand_lower, _BRAND_SEGMENT["default"])
+    depreciation = max(0.25, (1 - 0.10) ** age)   # %10/yıl, min %25 kalır
+    value = round(base_new * depreciation * (0.80 if has_damage else 1.0))
     reasoning = (
-        f"{brand or 'Bilinmeyen'} {segment} segment baz fiyatı (₺{base_2020:,}, 2020 model), "
-        f"{age} yıl amortismanla hesaplandı."
+        f"{brand or 'Bilinmeyen'} {segment} segment, 2025 sıfır baz ₺{base_new:,}, "
+        f"{age} yıl %10 amortismanla hesaplandı."
     )
     return {
         "rag_used": False,
