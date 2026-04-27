@@ -540,16 +540,16 @@ async def analyze(
                 if not car_year and ruhsat_data.get("yil"):
                     car_year = str(ruhsat_data["yil"])
             else:
-                vision_car_result = analyze_car_document(car_path)
-                ext = vision_car_result.get("extracted", {})
-                if not car_brand and ext.get("marka"):
-                    car_brand = ext["marka"]
-                if not car_model and ext.get("model"):
-                    car_model = ext["model"]
-                if not car_year and ext.get("yil"):
-                    car_year = str(ext["yil"])
-                if ext.get("hasar"):
-                    car_damage = "yes"
+                vr = analyze_car(car_path)
+                if vr:
+                    if not car_brand and vr.get("marka"): car_brand = vr["marka"]
+                    if not car_model and vr.get("model"): car_model = vr["model"]
+                    if not car_year  and vr.get("yil"):   car_year  = str(vr["yil"])
+                    if vr.get("hasar"):                    car_damage = "yes"
+                    if vr.get("estimated_value_tl"):
+                        vision_car_result = {"estimated_value": vr["estimated_value_tl"],
+                                             "confidence": vr.get("confidence", "medium"),
+                                             "reasoning": vr.get("reasoning", "")}
         except Exception:
             pass
 
@@ -567,12 +567,15 @@ async def analyze(
                 if not square_meters and tapu_data.get("yuzolcumu"):
                     square_meters = str(tapu_data["yuzolcumu"])
             else:
-                vision_house_result = analyze_house_document(house_path)
-                ext = vision_house_result.get("extracted", {})
-                if not city and ext.get("il"):
-                    city = ext["il"]
-                if not square_meters and ext.get("yuzolcumu"):
-                    square_meters = str(ext["yuzolcumu"])
+                vh = analyze_house(house_path)
+                if vh:
+                    if not city          and vh.get("il"):        city          = vh["il"]
+                    if not square_meters and vh.get("yuzolcumu"): square_meters = str(vh["yuzolcumu"])
+                    if vh.get("estimated_value_tl"):
+                        vision_house_result = {"estimated_value": vh["estimated_value_tl"],
+                                               "price_per_m2": vh.get("price_per_m2"),
+                                               "confidence": vh.get("confidence", "medium"),
+                                               "reasoning": vh.get("reasoning", "")}
         except Exception:
             pass
 
