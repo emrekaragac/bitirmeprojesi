@@ -264,6 +264,7 @@ async def scholarship_apply(
         saved_files["income_file"] = p
 
     # ── Araç: belge oku → alan çıkar → değer tahmin ──────────────────────────
+    ruhsat_data = None          # cross_check ve response'ta kullanılıyor
     estimated_car_value = None
     car_rag_used = False
     car_confidence = None
@@ -271,48 +272,46 @@ async def scholarship_apply(
 
     if has_car == "yes" and car_path:
         try:
-            # Önce pdfplumber ile metin dene (dijital PDF)
             text = extract_text(car_path)
             if text and len(text.strip()) > 20:
-                # Metin var → regex ile alanları çıkar
-                rd = parse_ruhsat(car_path)
-                if not car_brand and rd.get("marka"): car_brand = rd["marka"]
-                if not car_model and rd.get("model"):  car_model = rd["model"]
-                if not car_year  and rd.get("yil"):    car_year  = str(rd["yil"])
-                ocr_text = rd.get("raw_text", "")
-            else:
-                ocr_text = ""
+                ruhsat_data = parse_ruhsat(car_path)
+                if not car_brand and ruhsat_data.get("marka"): car_brand = ruhsat_data["marka"]
+                if not car_model and ruhsat_data.get("model"):  car_model = ruhsat_data["model"]
+                if not car_year  and ruhsat_data.get("yil"):    car_year  = str(ruhsat_data["yil"])
+            ocr_text = ruhsat_data.get("raw_text", "") if ruhsat_data else ""
 
-            # Eksik alanlar varsa Claude Vision ile doldur ve değeri al
-            if not (car_brand and car_year) or not ocr_text:
+            # Vision: marka veya yıl yoksa çağır (kullanıcı zaten girdiyse atla)
+            if not (car_brand and car_year):
                 vr = analyze_car(car_path)
                 if vr:
                     if not car_brand and vr.get("marka"):  car_brand = vr["marka"]
                     if not car_model and vr.get("model"):  car_model = vr["model"]
                     if not car_year  and vr.get("yil"):    car_year  = str(vr["yil"])
                     if vr.get("hasar"):                     car_damage = "yes"
-                    # Vision aynı zamanda değer tahmini yaptı
                     if vr.get("estimated_value_tl"):
                         estimated_car_value = vr["estimated_value_tl"]
-                        car_rag_used  = True
+                        car_rag_used   = True
                         car_confidence = vr.get("confidence", "medium")
                         car_reasoning  = vr.get("reasoning", "")
 
-            # Vision değer vermediyse → metin + piyasa bağlamı ile Claude text API
             if not estimated_car_value and car_brand and car_year:
-                res = rag_estimate_car(
-                    brand=car_brand, model=car_model,
-                    year=int(car_year), has_damage=(car_damage == "yes"),
-                    ocr_text=ocr_text,
-                )
-                estimated_car_value = res.get("estimated_car_value")
-                car_rag_used   = res.get("rag_used", False)
-                car_confidence = res.get("confidence")
-                car_reasoning  = res.get("reasoning")
+                try:
+                    res_car = rag_estimate_car(
+                        brand=car_brand, model=car_model,
+                        year=int(car_year), has_damage=(car_damage == "yes"),
+                        ocr_text=ocr_text,
+                    )
+                    estimated_car_value = res_car.get("estimated_car_value")
+                    car_rag_used   = res_car.get("rag_used", False)
+                    car_confidence = res_car.get("confidence")
+                    car_reasoning  = res_car.get("reasoning")
+                except Exception:
+                    pass
         except Exception:
             pass
 
     # ── Tapu: belge oku → alan çıkar → değer tahmin ──────────────────────────
+    tapu_data = None            # cross_check ve response'ta kullanılıyor
     property_estimated_value = None
     avg_m2_price = None
     property_rag_used = False
@@ -323,36 +322,37 @@ async def scholarship_apply(
         try:
             text = extract_text(house_path)
             if text and len(text.strip()) > 20:
-                td = parse_tapu(house_path)
-                if not city         and td.get("il"):        city         = td["il"]
-                if not square_meters and td.get("yuzolcumu"): square_meters = str(td["yuzolcumu"])
-                ocr_text = td.get("raw_text", "")
-            else:
-                ocr_text = ""
+                tapu_data = parse_tapu(house_path)
+                if not city          and tapu_data.get("il"):        city          = tapu_data["il"]
+                if not square_meters and tapu_data.get("yuzolcumu"): square_meters = str(tapu_data["yuzolcumu"])
+            ocr_text = tapu_data.get("raw_text", "") if tapu_data else ""
 
-            if not (city and square_meters) or not ocr_text:
+            if not (city and square_meters):
                 vh = analyze_house(house_path)
                 if vh:
-                    if not city          and vh.get("il"):       city          = vh["il"]
-                    if not square_meters and vh.get("yuzolcumu"):square_meters = str(vh["yuzolcumu"])
+                    if not city          and vh.get("il"):        city          = vh["il"]
+                    if not square_meters and vh.get("yuzolcumu"): square_meters = str(vh["yuzolcumu"])
                     if vh.get("estimated_value_tl"):
                         property_estimated_value = vh["estimated_value_tl"]
-                        avg_m2_price       = vh.get("price_per_m2")
-                        property_rag_used  = True
+                        avg_m2_price        = vh.get("price_per_m2")
+                        property_rag_used   = True
                         property_confidence = vh.get("confidence", "medium")
                         property_reasoning  = vh.get("reasoning", "")
 
             if not property_estimated_value and city and square_meters:
-                val = rag_estimate_property(
-                    city=city, district=district,
-                    square_meters=float(square_meters),
-                    ocr_text=ocr_text,
-                )
-                property_estimated_value = val.get("property_estimated_value")
-                avg_m2_price        = val.get("avg_m2_price")
-                property_rag_used   = val.get("rag_used", False)
-                property_confidence = val.get("confidence")
-                property_reasoning  = val.get("reasoning")
+                try:
+                    val = rag_estimate_property(
+                        city=city, district=district,
+                        square_meters=float(square_meters),
+                        ocr_text=ocr_text,
+                    )
+                    property_estimated_value = val.get("property_estimated_value")
+                    avg_m2_price        = val.get("avg_m2_price")
+                    property_rag_used   = val.get("rag_used", False)
+                    property_confidence = val.get("confidence")
+                    property_reasoning  = val.get("reasoning")
+                except Exception:
+                    pass
         except Exception:
             pass
 
