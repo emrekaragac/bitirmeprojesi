@@ -272,9 +272,10 @@ export default function SetupPage() {
           </button>
           <a href="/admin" className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm text-center">Admin →</a>
         </div>
+        <a href="/" className="mt-3 block text-center text-sm font-semibold text-indigo-500 hover:text-indigo-700">← Ana Sayfaya Dön</a>
         <button
           onClick={() => { setCreatedId(null); setStep(0); setConfig({ name:"",description:"",deadline:"",type:"financial",financial_weight:100,academic_weight:0,documents:[],questions:[] }) }}
-          className="mt-3 text-xs text-slate-400 hover:text-slate-600">
+          className="mt-1 text-xs text-slate-400 hover:text-slate-600">
           Create another scholarship
         </button>
       </div>

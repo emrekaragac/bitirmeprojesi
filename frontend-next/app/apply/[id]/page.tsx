@@ -217,7 +217,6 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       setDocValidation(prev => { const n = { ...prev }; delete n[key]; return n })
       return
     }
-    // Anlık doğrulama — backend'e gönder
     setDocValidation(prev => ({ ...prev, [key]: { status: "checking", message: "" } }))
     try {
       const fd = new FormData()
@@ -225,22 +224,25 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       const res = await fetch(`${API}/validate-document/${key}`, { method: "POST", body: fd })
       if (res.ok) {
         const data = await res.json()
+        // Sadece Vision kesin "hayır" dediyse bloke et.
+        // valid=false ama vision_unavailable=true → teknik sorun, bloke etme.
+        const isDefinitelyInvalid = data.valid === false && !data.vision_unavailable
         setDocValidation(prev => ({
           ...prev,
           [key]: {
-            status: data.valid ? "valid" : "invalid",
+            status: isDefinitelyInvalid ? "invalid" : data.valid ? "valid" : "unknown",
             message: data.message ?? "",
           },
         }))
       } else {
-        // API hata / 500 → bloke ETME, uyarıyla kabul et
+        // HTTP 4xx/5xx → teknik hata, bloke etme
         setDocValidation(prev => ({
           ...prev,
           [key]: { status: "unknown", message: "⚠️ Doğrulama servisi yanıt vermedi. Belge kabul edildi, manuel incelemeye alınacak." },
         }))
       }
     } catch {
-      // Ağ hatası / backend uyuyor → unknown, uyar ama engelleme
+      // Ağ hatası / backend uyuyor → bloke etme
       setDocValidation(prev => ({
         ...prev,
         [key]: { status: "unknown", message: "⚠️ Doğrulama servisi yanıt vermedi. Belge kabul edildi ancak manuel incelemeye alınacak." },
