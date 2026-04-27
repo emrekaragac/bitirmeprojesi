@@ -87,207 +87,101 @@ DOC_SIGNATURES: dict = {
 
 def validate_document(file_path: str, expected_doc_id: str) -> dict:
     """
-    Yüklenen dosyanın beklenen belge türüne uygun olup olmadığını kontrol eder.
-
     Strateji:
-      1. pdfplumber ile metin çıkar → anahtar kelime eşleştir (hızlı, tesseract gerekmez)
-      2. Metin yoksa veya kısaysa → Claude Vision ile görsel analiz (fotoğraf PDF'leri için)
-
-    Döndürür: {valid, expected_name, detected_name, message, confidence, hits}
+      1. pdfplumber ile metin çıkar → yeterli metin varsa keyword eşleştir
+      2. Metin yoksa (fotoğraf PDF) → Claude Vision ile görsel analiz
+      3. Vision yanıt vermezse → uyarıyla kabul et (bloke etme)
     """
+    from backend.claude_vision import analyze_car, analyze_house, analyze_generic
+
     sig = DOC_SIGNATURES.get(expected_doc_id)
-
     if not sig:
-        return {
-            "valid": True,
-            "expected_name": expected_doc_id,
-            "detected_name": expected_doc_id,
-            "message": "Belge alındı.",
-            "confidence": 1.0,
-            "hits": 0,
-        }
+        return {"valid": True, "message": "Belge alındı.", "vision_unavailable": False}
 
+    # 1. Metin tabanlı kontrol (dijital PDF'ler için)
     text = extract_text(file_path)
-    text_is_short = not text or len(text.strip()) < 80
-
-    # ── Yeterli metin varsa → anahtar kelime tabanlı doğrulama ──────────────
-    if not text_is_short:
+    if text and len(text.strip()) >= 80:
         text_upper = text.upper()
         required_any = sig.get("required_any", [])
         has_anchor = not required_any or any(kw in text_upper for kw in required_any)
         hits = sum(1 for kw in sig["keywords"] if kw in text_upper)
-        confidence = round(hits / len(sig["keywords"]), 2)
         valid = has_anchor and hits >= sig["min_hits"]
 
-        best_other: Optional[str] = None
-        best_other_hits = 0
+        if valid:
+            return {"valid": True, "message": f"✅ Geçerli {sig['name']} tespit edildi.",
+                    "confidence": round(hits / len(sig["keywords"]), 2), "hits": hits}
+
+        # Keyword eşleşmedi ama metin var → hangi belge olduğunu bul
+        best_other = None
         for doc_id, other_sig in DOC_SIGNATURES.items():
             if doc_id == expected_doc_id:
                 continue
-            other_hits = sum(1 for kw in other_sig["keywords"] if kw in text_upper)
-            if other_hits >= other_sig["min_hits"] and other_hits > best_other_hits:
-                best_other_hits = other_hits
+            if sum(1 for kw in other_sig["keywords"] if kw in text_upper) >= other_sig["min_hits"]:
                 best_other = other_sig["name"]
+                break
 
-        if valid:
-            message = f"✅ Geçerli {sig['name']} tespit edildi."
-            detected = sig["name"]
-        elif not has_anchor:
-            message = (
-                f"❌ Bu belge {sig['name']} değil. "
-                f"{sig['name']} için gerekli temel bilgiler bulunamadı. "
-                f"Lütfen doğru belgeyi yükleyin."
-            )
-            detected = best_other if best_other else None
-        elif best_other:
-            message = (
-                f"❌ Yüklenen dosya '{best_other}' gibi görünüyor. "
-                f"Bu alana lütfen geçerli bir {sig['name']} yükleyin."
-            )
-            detected = best_other
-        else:
-            message = (
-                f"❌ Bu PDF'in {sig['name']} olduğu doğrulanamadı. "
-                f"Lütfen doğru belgeyi yükleyin."
-            )
-            detected = None
+        msg = (f"❌ Yüklenen dosya '{best_other}' gibi görünüyor. Lütfen geçerli bir {sig['name']} yükleyin."
+               if best_other else f"❌ Bu belgenin {sig['name']} olduğu doğrulanamadı.")
+        return {"valid": False, "message": msg, "confidence": 0.0, "hits": hits}
 
-        return {
-            "valid": valid,
-            "expected_name": sig["name"],
-            "detected_name": detected,
-            "message": message,
-            "confidence": confidence,
-            "hits": hits,
-        }
-
-    # ── Metin çıkarılamadı → Claude Vision ile görsel analiz ─────────────────
-    # (fotoğraf PDF'leri, taranmış belgeler)
+    # 2. Metin yok → Claude Vision
     try:
-        from backend.claude_vision import (
-            analyze_car_document,
-            analyze_house_document,
-            analyze_generic_document,
-        )
         if expected_doc_id == "car_file":
-            result = analyze_car_document(file_path)
+            result = analyze_car(file_path)
         elif expected_doc_id == "house_file":
-            result = analyze_house_document(file_path)
+            result = analyze_house(file_path)
         else:
-            result = analyze_generic_document(file_path, expected_doc_id)
+            result = analyze_generic(file_path, expected_doc_id)
 
-        valid = result.get("valid")
-        # valid=None → Vision ulaşılamadı/hata → engelleme YOK, uyarıyla kabul et
-        if valid is None:
+        if result is None:
+            # Vision kullanılamadı → uyarıyla kabul et
             return {
-                "valid": True,          # bloke etme — manuel incelemeye al
-                "expected_name": sig["name"],
-                "detected_name": None,
-                "message": "⚠️ Görsel doğrulama servisi yanıt vermedi. Belge kabul edildi, manuel incelemeye alınacak.",
-                "confidence": 0.0,
-                "hits": 0,
-                "vision_used": True,
+                "valid": True,
+                "message": "⚠️ Görsel doğrulama yapılamadı. Belge kabul edildi, manuel incelemeye alınacak.",
                 "vision_unavailable": True,
             }
+
         return {
-            "valid": valid,
-            "expected_name": sig["name"],
-            "detected_name": sig["name"] if valid else None,
-            "message": result.get("message", ""),
+            "valid": result["valid"],
+            "message": result["message"],
             "confidence": result.get("confidence", 0.5),
             "hits": 0,
             "vision_used": True,
-            "vision_extracted": result.get("extracted", {}),
+            "vision_unavailable": False,
+            # Araç/ev için çıkarılan alanlar (apply endpoint'i kullanır)
+            **{k: result[k] for k in ("marka","model","yil","plaka","yakit","hasar",
+                                       "estimated_value_tl","il","ilce","yuzolcumu",
+                                       "price_per_m2","reasoning") if k in result},
         }
+
     except Exception as e:
-        # Herhangi bir hata → bloke etme, uyarıyla kabul et
         return {
             "valid": True,
-            "expected_name": sig["name"],
-            "detected_name": None,
-            "message": f"⚠️ Görsel analiz başarısız ({str(e)[:60]}). Belge manuel incelemeye alınacak.",
-            "confidence": 0.0,
-            "hits": 0,
+            "message": f"⚠️ Doğrulama hatası ({str(e)[:60]}). Belge manuel incelemeye alınacak.",
             "vision_unavailable": True,
         }
 
 
-def _extract_text_from_pdf(file_path: str) -> str:
-    """PDF'ten metin çıkar. Önce pdfplumber (metin tabanlı),
-    yeterince metin yoksa PyMuPDF + tesseract ile OCR (görüntü tabanlı PDF)."""
-    text = ""
-
-    # 1. Katman: pdfplumber — seçilebilir metin (hızlı)
+def extract_text(file_path: str) -> str:
+    """
+    PDF'ten seçilebilir metin katmanını çıkar (pdfplumber).
+    Fotoğraf PDF'leri için boş string döner — caller Claude Vision'a yönlendirir.
+    Tesseract Render'da yüklü olmadığı için OCR denemesi yok.
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext != ".pdf":
+        return ""
     try:
         import pdfplumber
+        text = ""
         with pdfplumber.open(file_path) as pdf:
             for page in pdf.pages:
                 t = page.extract_text()
                 if t:
                     text += t + "\n"
-    except Exception:
-        pass
-
-    # Yeterli metin varsa bitir
-    if len(text.strip()) >= 80:
-        return text
-
-    # 2. Katman: PyMuPDF → PIL Image → pytesseract OCR
-    # (fotoğraf PDF'leri veya taranmış belgeler için)
-    try:
-        import fitz  # PyMuPDF
-        import pytesseract
-        from PIL import Image
-        import io
-
-        doc = fitz.open(file_path)
-        ocr_text = ""
-        for page in doc:
-            # 200 DPI kalitesinde render et
-            mat = fitz.Matrix(200 / 72, 200 / 72)
-            pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB)
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            try:
-                t = pytesseract.image_to_string(img, lang="tur+eng")
-            except Exception:
-                t = pytesseract.image_to_string(img, lang="eng")
-            if t:
-                ocr_text += t + "\n"
-        doc.close()
-
-        if len(ocr_text.strip()) > len(text.strip()):
-            return ocr_text
-    except Exception:
-        pass
-
-    return text
-
-
-def _extract_text_from_image(file_path: str) -> str:
-    try:
-        import pytesseract
-        from PIL import Image
-        img = Image.open(file_path)
-        text = pytesseract.image_to_string(img, lang="tur+eng")
         return text
     except Exception:
-        try:
-            import pytesseract
-            from PIL import Image
-            img = Image.open(file_path)
-            text = pytesseract.image_to_string(img, lang="eng")
-            return text
-        except Exception:
-            return ""
-
-
-def extract_text(file_path: str) -> str:
-    ext = os.path.splitext(file_path)[1].lower()
-    if ext == ".pdf":
-        return _extract_text_from_pdf(file_path)
-    elif ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"]:
-        return _extract_text_from_image(file_path)
-    return ""
+        return ""
 
 
 def parse_ruhsat(file_path: str) -> dict:

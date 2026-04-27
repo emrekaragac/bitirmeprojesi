@@ -12,8 +12,8 @@ from backend.academic_scoring import compute_academic_score
 from backend.parametric_scoring import compute_parametric_score
 from backend.reporting import generate_report
 from backend.rag_valuation import rag_estimate_property, rag_estimate_car
-from backend.ocr import parse_ruhsat, parse_tapu, validate_document
-from backend.claude_vision import analyze_car_document, analyze_house_document
+from backend.ocr import parse_ruhsat, parse_tapu, validate_document, extract_text
+from backend.claude_vision import analyze_car, analyze_house
 from backend.verification import validate_tc_no, scan_qr, cross_check
 from backend.db import init_db, save_application, get_all_applications, get_application
 from backend.scholarship_db import (
@@ -234,132 +234,125 @@ async def scholarship_apply(
         raise HTTPException(status_code=404, detail="Scholarship not found")
 
     saved_files = {}
-    ruhsat_data = None
-    tapu_data   = None
 
-    # OCR — Car
-    vision_car_result = None
+    # ── Dosyaları kaydet ─────────────────────────────────────────────────────
+    car_path   = None
+    house_path = None
+
     if car_file and car_file.filename:
         car_path = f"uploads/{car_file.filename}"
         with open(car_path, "wb") as buf:
             buf.write(await car_file.read())
         saved_files["car_file"] = car_path
-        try:
-            ruhsat_data = parse_ruhsat(car_path)
-            if ruhsat_data.get("ocr_success"):
-                if not car_brand and ruhsat_data.get("marka"):
-                    car_brand = ruhsat_data["marka"]
-                if not car_model and ruhsat_data.get("model"):
-                    car_model = ruhsat_data["model"]
-                if not car_year and ruhsat_data.get("yil"):
-                    car_year = str(ruhsat_data["yil"])
-            else:
-                # Metin çıkarılamadı → Claude Vision ile dene
-                vision_car_result = analyze_car_document(car_path)
-                ext = vision_car_result.get("extracted", {})
-                if not car_brand and ext.get("marka"):
-                    car_brand = ext["marka"]
-                if not car_model and ext.get("model"):
-                    car_model = ext["model"]
-                if not car_year and ext.get("yil"):
-                    car_year = str(ext["yil"])
-                if ext.get("hasar") and car_damage != "yes":
-                    car_damage = "yes"
-        except Exception:
-            pass
 
-    # OCR — House
-    vision_house_result = None
     if house_file and house_file.filename:
         house_path = f"uploads/{house_file.filename}"
         with open(house_path, "wb") as buf:
             buf.write(await house_file.read())
         saved_files["house_file"] = house_path
-        try:
-            tapu_data = parse_tapu(house_path)
-            if tapu_data.get("ocr_success"):
-                if not city and tapu_data.get("il"):
-                    city = tapu_data["il"]
-                if not square_meters and tapu_data.get("yuzolcumu"):
-                    square_meters = str(tapu_data["yuzolcumu"])
-            else:
-                # Metin çıkarılamadı → Claude Vision ile dene
-                vision_house_result = analyze_house_document(house_path)
-                ext = vision_house_result.get("extracted", {})
-                if not city and ext.get("il"):
-                    city = ext["il"]
-                if not square_meters and ext.get("yuzolcumu"):
-                    square_meters = str(ext["yuzolcumu"])
-        except Exception:
-            pass
 
-    # Transcript (save only)
     if transcript_file and transcript_file.filename:
-        t_path = f"uploads/{transcript_file.filename}"
-        with open(t_path, "wb") as buf:
+        p = f"uploads/{transcript_file.filename}"
+        with open(p, "wb") as buf:
             buf.write(await transcript_file.read())
-        saved_files["transcript_file"] = t_path
+        saved_files["transcript_file"] = p
 
-    # Income doc (save only)
     if income_file and income_file.filename:
-        i_path = f"uploads/{income_file.filename}"
-        with open(i_path, "wb") as buf:
+        p = f"uploads/{income_file.filename}"
+        with open(p, "wb") as buf:
             buf.write(await income_file.read())
-        saved_files["income_file"] = i_path
+        saved_files["income_file"] = p
 
-    # Valuations — Hoca akışı: Belge OCR/Vision → bilgi çıkar → Claude'a gönder → değer
+    # ── Araç: belge oku → alan çıkar → değer tahmin ──────────────────────────
     estimated_car_value = None
     car_rag_used = False
     car_confidence = None
     car_reasoning = None
-    if has_car == "yes":
+
+    if has_car == "yes" and car_path:
         try:
-            # Öncelik: Vision doğrudan değer döndürdüyse kullan (tek API çağrısı)
-            if vision_car_result and vision_car_result.get("estimated_value"):
-                estimated_car_value = vision_car_result["estimated_value"]
-                car_rag_used = True
-                car_confidence = vision_car_result.get("confidence", "medium")
-                car_reasoning = vision_car_result.get("reasoning", "")
-            elif car_brand and car_year:
-                car_ocr_text = ruhsat_data.get("raw_text", "") if ruhsat_data else ""
+            # Önce pdfplumber ile metin dene (dijital PDF)
+            text = extract_text(car_path)
+            if text and len(text.strip()) > 20:
+                # Metin var → regex ile alanları çıkar
+                rd = parse_ruhsat(car_path)
+                if not car_brand and rd.get("marka"): car_brand = rd["marka"]
+                if not car_model and rd.get("model"):  car_model = rd["model"]
+                if not car_year  and rd.get("yil"):    car_year  = str(rd["yil"])
+                ocr_text = rd.get("raw_text", "")
+            else:
+                ocr_text = ""
+
+            # Eksik alanlar varsa Claude Vision ile doldur ve değeri al
+            if not (car_brand and car_year) or not ocr_text:
+                vr = analyze_car(car_path)
+                if vr:
+                    if not car_brand and vr.get("marka"):  car_brand = vr["marka"]
+                    if not car_model and vr.get("model"):  car_model = vr["model"]
+                    if not car_year  and vr.get("yil"):    car_year  = str(vr["yil"])
+                    if vr.get("hasar"):                     car_damage = "yes"
+                    # Vision aynı zamanda değer tahmini yaptı
+                    if vr.get("estimated_value_tl"):
+                        estimated_car_value = vr["estimated_value_tl"]
+                        car_rag_used  = True
+                        car_confidence = vr.get("confidence", "medium")
+                        car_reasoning  = vr.get("reasoning", "")
+
+            # Vision değer vermediyse → metin + piyasa bağlamı ile Claude text API
+            if not estimated_car_value and car_brand and car_year:
                 res = rag_estimate_car(
                     brand=car_brand, model=car_model,
                     year=int(car_year), has_damage=(car_damage == "yes"),
-                    ocr_text=car_ocr_text,
+                    ocr_text=ocr_text,
                 )
                 estimated_car_value = res.get("estimated_car_value")
-                car_rag_used = res.get("rag_used", False)
+                car_rag_used   = res.get("rag_used", False)
                 car_confidence = res.get("confidence")
-                car_reasoning = res.get("reasoning")
+                car_reasoning  = res.get("reasoning")
         except Exception:
             pass
 
+    # ── Tapu: belge oku → alan çıkar → değer tahmin ──────────────────────────
     property_estimated_value = None
     avg_m2_price = None
     property_rag_used = False
     property_confidence = None
     property_reasoning = None
-    if has_house == "yes":
+
+    if has_house == "yes" and house_path:
         try:
-            # Öncelik: Vision doğrudan değer döndürdüyse kullan
-            if vision_house_result and vision_house_result.get("estimated_value"):
-                property_estimated_value = vision_house_result["estimated_value"]
-                avg_m2_price = vision_house_result.get("price_per_m2")
-                property_rag_used = True
-                property_confidence = vision_house_result.get("confidence", "medium")
-                property_reasoning = vision_house_result.get("reasoning", "")
-            elif city and square_meters:
-                house_ocr_text = tapu_data.get("raw_text", "") if tapu_data else ""
+            text = extract_text(house_path)
+            if text and len(text.strip()) > 20:
+                td = parse_tapu(house_path)
+                if not city         and td.get("il"):        city         = td["il"]
+                if not square_meters and td.get("yuzolcumu"): square_meters = str(td["yuzolcumu"])
+                ocr_text = td.get("raw_text", "")
+            else:
+                ocr_text = ""
+
+            if not (city and square_meters) or not ocr_text:
+                vh = analyze_house(house_path)
+                if vh:
+                    if not city          and vh.get("il"):       city          = vh["il"]
+                    if not square_meters and vh.get("yuzolcumu"):square_meters = str(vh["yuzolcumu"])
+                    if vh.get("estimated_value_tl"):
+                        property_estimated_value = vh["estimated_value_tl"]
+                        avg_m2_price       = vh.get("price_per_m2")
+                        property_rag_used  = True
+                        property_confidence = vh.get("confidence", "medium")
+                        property_reasoning  = vh.get("reasoning", "")
+
+            if not property_estimated_value and city and square_meters:
                 val = rag_estimate_property(
                     city=city, district=district,
                     square_meters=float(square_meters),
-                    ocr_text=house_ocr_text,
+                    ocr_text=ocr_text,
                 )
                 property_estimated_value = val.get("property_estimated_value")
-                avg_m2_price = val.get("avg_m2_price")
-                property_rag_used = val.get("rag_used", False)
+                avg_m2_price        = val.get("avg_m2_price")
+                property_rag_used   = val.get("rag_used", False)
                 property_confidence = val.get("confidence")
-                property_reasoning = val.get("reasoning")
+                property_reasoning  = val.get("reasoning")
         except Exception:
             pass
 
