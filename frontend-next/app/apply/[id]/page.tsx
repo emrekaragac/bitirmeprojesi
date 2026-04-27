@@ -649,6 +649,69 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                         {dv.message}
                       </p>
                     )}
+
+                    {/* Manuel giriş — yalnızca doğrulanamadı durumunda */}
+                    {file && status === "unknown" && docId === "car_file" && (
+                      <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
+                        <p className="text-xs font-semibold text-amber-800">Araç bilgilerini manuel girin:</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            placeholder="Marka (ör. Toyota)"
+                            value={values["car_brand"] || ""}
+                            onChange={e => setValues(p => ({ ...p, car_brand: e.target.value }))}
+                          />
+                          <input
+                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            placeholder="Model (ör. Corolla)"
+                            value={values["car_model"] || ""}
+                            onChange={e => setValues(p => ({ ...p, car_model: e.target.value }))}
+                          />
+                          <input
+                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            placeholder="Yıl (ör. 2020)"
+                            type="number"
+                            value={values["car_year"] || ""}
+                            onChange={e => setValues(p => ({ ...p, car_year: e.target.value }))}
+                          />
+                          <select
+                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            value={values["car_damage"] || "no"}
+                            onChange={e => setValues(p => ({ ...p, car_damage: e.target.value }))}
+                          >
+                            <option value="no">Hasar kaydı yok</option>
+                            <option value="yes">Hasar kaydı var</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {file && status === "unknown" && docId === "house_file" && (
+                      <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
+                        <p className="text-xs font-semibold text-amber-800">Tapu bilgilerini manuel girin:</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            placeholder="Şehir (ör. İstanbul)"
+                            value={values["city"] || ""}
+                            onChange={e => setValues(p => ({ ...p, city: e.target.value }))}
+                          />
+                          <input
+                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            placeholder="İlçe (ör. Kadıköy)"
+                            value={values["district"] || ""}
+                            onChange={e => setValues(p => ({ ...p, district: e.target.value }))}
+                          />
+                          <input
+                            className="col-span-2 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            placeholder="Alan (m²) ör. 95"
+                            type="number"
+                            value={values["square_meters"] || ""}
+                            onChange={e => setValues(p => ({ ...p, square_meters: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}
