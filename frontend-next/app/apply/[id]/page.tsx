@@ -154,6 +154,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
   const [values, setValues] = useState<Record<string, string>>({})
   const [files, setFiles]   = useState<Record<string, File>>({})
   const [loading, setLoading] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult]  = useState<Result | null>(null)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [kvkkAccepted, setKvkkAccepted] = useState(false)
@@ -253,6 +254,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
   async function handleSubmit() {
     if (!scholarship) return
     setLoading(true)
+    setSubmitError(null)
     try {
       const fd = new FormData()
       // identity
@@ -280,14 +282,22 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       })
 
       const res = await fetch(`${API}/scholarship/${id}/apply`, { method: "POST", body: fd })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        const txt = await res.text().catch(() => `HTTP ${res.status}`)
+        throw new Error(txt)
+      }
       const data = await res.json()
       setResult(data)
       setStep(3)
-      // Clear draft after successful submission
       try { localStorage.removeItem(DRAFT_KEY) } catch {}
-    } catch (e) {
-      alert("Submission error: " + e)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      const isFetch = msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("network")
+      setSubmitError(
+        isFetch
+          ? "Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin."
+          : `Gönderim hatası: ${msg.slice(0, 200)}`
+      )
     } finally {
       setLoading(false)
     }
@@ -722,6 +732,20 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-sm text-red-700 space-y-1">
                 <p className="font-bold">❌ Geçersiz belge tespit edildi</p>
                 <p>Lütfen kırmızı işaretli belgeleri kaldırıp doğru belgeyi yükleyin. Yanlış belgeyle başvuru gönderilemez.</p>
+              </div>
+            )}
+
+            {/* Gönderim hatası */}
+            {submitError && (
+              <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 space-y-2">
+                <p className="text-sm font-bold text-red-700">❌ Başvuru gönderilemedi</p>
+                <p className="text-xs text-red-600">{submitError}</p>
+                <button
+                  onClick={handleSubmit}
+                  className="mt-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg"
+                >
+                  Tekrar Dene
+                </button>
               </div>
             )}
 
