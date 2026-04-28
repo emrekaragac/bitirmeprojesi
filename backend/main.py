@@ -129,22 +129,42 @@ def debug_system():
 def debug_price(brand: str = "mercedes-benz", model: str = "S400d", year: int = 2022):
     """Araç fiyat tahmin pipeline'ını adım adım test eder."""
     from backend.rag_valuation import (
-        _lookup_model_price, _live_search_price, rag_estimate_car
+        _lookup_model_price, _live_search_price, rag_estimate_car,
+        _run_web_search, _extract_prices
     )
+    import os, anthropic as _anthropic
+
     result: dict = {"brand": brand, "model": model, "year": year}
 
     # 1. Model tablosu
     ref = _lookup_model_price(brand, model, year)
     result["model_table_price"] = f"₺{ref:,}" if ref else "bulunamadı"
 
-    # 2. Web search (ayrı çalıştır)
+    # 2. Web search ham yanıt
+    try:
+        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        client = _anthropic.Anthropic(api_key=api_key)
+        prompt = (
+            f"Sahibinden.com'da '{year} {brand} {model} ikinci el' ara. "
+            f"Arama sonuçlarında gördüğün ilan fiyatlarını (TL) SADECE listele, "
+            f"yorum yapma, tahmin yapma. Her fiyat ayrı satırda."
+        )
+        raw_text = _run_web_search(client, "claude-haiku-4-5-20251001", prompt)
+        prices = _extract_prices(raw_text, 50_000, 100_000_000)
+        result["web_search_raw"] = raw_text[:600]
+        result["web_search_prices"] = prices
+    except Exception as e:
+        result["web_search_raw"] = f"hata: {e}"
+        result["web_search_prices"] = []
+
+    # 3. Live search sonucu
     try:
         live = _live_search_price(brand, model, year, has_damage=False)
         result["live_search"] = live if live else "None döndü"
     except Exception as e:
         result["live_search"] = f"hata: {e}"
 
-    # 3. Nihai sonuç
+    # 4. Nihai sonuç
     try:
         final = rag_estimate_car(brand, model, year, has_damage=False)
         result["final_estimate"] = final
