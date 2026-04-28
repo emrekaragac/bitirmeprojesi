@@ -2,11 +2,10 @@
 PSDS — Araç ve Konut Fiyat Çekici
 
 Pipeline:
-  1. DuckDuckGo arama → arabam.com / sahibinden.com URL'leri bul
-  2. Listing sayfalarını scrape et
-  3. Regex ile TL fiyatları çıkar (min 10 kayıt hedefi)
-  4. IQR yöntemiyle outlier temizle
-  5. Ortalama / medyan döndür
+  1. Google (→ DuckDuckGo fallback) arama
+  2. Arama sonucu snippet metinlerinden TL fiyatlarını regex ile çek
+  3. IQR ile outlier temizle
+  4. Ortalama / medyan döndür
 """
 
 import re
@@ -20,7 +19,7 @@ except ImportError:
     _WEB_OK = False
 
 
-_HEADERS = {
+_HEADERS_GOOGLE = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -46,7 +45,7 @@ def _fetch(url: str, extra_headers: dict | None = None) -> Optional[str]:
     if not _WEB_OK:
         return None
     try:
-        headers = {**_HEADERS, **(extra_headers or {})}
+        headers = {**_HEADERS_GOOGLE, **(extra_headers or {})}
         with httpx.Client(timeout=_TIMEOUT, headers=headers, follow_redirects=True) as client:
             r = client.get(url)
             if r.status_code == 200 and len(r.text) > 3000:
@@ -57,31 +56,47 @@ def _fetch(url: str, extra_headers: dict | None = None) -> Optional[str]:
     return None
 
 
-# ── Fiyat çıkarma ────────────────────────────────────────────────────────────
+# ── Arama sayfası çekme ──────────────────────────────────────────────────────
 
-_PRICE_PATTERNS = [
-    r'(\d{1,3}(?:\.\d{3})+)\s*(?:TL|₺)',          # 1.500.000 TL
-    r'(?:TL|₺)\s*(\d{1,3}(?:\.\d{3})+)',          # ₺ 1.500.000
-    r'"price"\s*:\s*"?(\d{6,9})"?',               # JSON: "price": "1500000"
-    r'data-price["\s=:]+(\d{6,9})',                # data attribute
-    r'content["\s=:]+(\d{6,9})',                   # meta content
-    r'(\d{1,3}(?:,\d{3})+)\s*(?:TL|₺)',           # 1,500,000 TL
-    r'fiyat[^0-9]{0,10}(\d{6,9})',                 # fiyat: 1500000
+def _fetch_search(query: str) -> Optional[str]:
+    """Google → DuckDuckGo sırasıyla dener, snippet HTML'i döndürür."""
+    q = query.replace(" ", "+")
+    urls = [
+        f"https://www.google.com/search?q={q}&hl=tr&num=20&lr=lang_tr",
+        f"https://html.duckduckgo.com/html/?q={q}&kl=tr-tr",
+    ]
+    for url in urls:
+        referer = "https://www.google.com/" if "google" in url else "https://duckduckgo.com/"
+        html = _fetch(url, extra_headers={"Referer": referer})
+        if html and len(html) > 5000:
+            print(f"[WEB] Search OK: {url[:60]}")
+            return html
+    return None
+
+
+# ── Fiyat çıkarma (snippet metninden) ───────────────────────────────────────
+
+_PRICE_RE = [
+    r'(\d{1,3}(?:\.\d{3})+)\s*(?:TL|₺)',      # 12.249.900 TL
+    r'(?:TL|₺)\s*(\d{1,3}(?:\.\d{3})+)',      # ₺ 12.249.900
+    r'(\d{1,3}(?:,\d{3})+)\s*(?:TL|₺)',       # 12,249,900 TL
+    r'"price"\s*:\s*"?(\d{6,10})"?',           # JSON "price":"12249900"
+    r'data-price["\s=:]+(\d{6,10})',            # data-price="12249900"
 ]
 
 
-def _extract_prices(html: str, min_val: int, max_val: int) -> list[int]:
-    prices: set[int] = set()
-    for pattern in _PRICE_PATTERNS:
-        for tok in re.findall(pattern, html, re.IGNORECASE):
+def _extract_prices(text: str, min_val: int, max_val: int) -> list[int]:
+    found: set[int] = set()
+    for pat in _PRICE_RE:
+        for tok in re.findall(pat, text, re.IGNORECASE):
             clean = tok.replace(".", "").replace(",", "")
             try:
-                val = int(clean)
-                if min_val <= val <= max_val:
-                    prices.add(val)
+                v = int(clean)
+                if min_val <= v <= max_val:
+                    found.add(v)
             except ValueError:
                 pass
-    return sorted(prices)
+    return sorted(found)
 
 
 # ── IQR outlier temizleme ────────────────────────────────────────────────────
@@ -102,112 +117,54 @@ def _remove_outliers(prices: list[int]) -> list[int]:
     return filtered if len(filtered) >= 3 else s
 
 
-# ── DuckDuckGo arama → URL listesi ──────────────────────────────────────────
-
-def _ddg_search_urls(query: str, domains: list[str]) -> list[str]:
-    """DuckDuckGo HTML aramadan belirtilen domainlere ait URL'leri çıkarır."""
-    q = query.replace(" ", "+")
-    url = f"https://html.duckduckgo.com/html/?q={q}"
-    html = _fetch(url, extra_headers={"Referer": "https://duckduckgo.com/"})
-    if not html:
-        return []
-    # href içindeki URL'leri bul
-    href_pattern = r'href="(https?://[^"]+)"'
-    all_urls = re.findall(href_pattern, html)
-    result = []
-    for u in all_urls:
-        if any(d in u for d in domains):
-            # DuckDuckGo redirect URL'lerini temizle
-            clean = re.sub(r'^https?://[^/]*duckduckgo[^/]*/l/\?uddg=', '', u)
-            try:
-                from urllib.parse import unquote
-                clean = unquote(clean)
-            except Exception:
-                pass
-            if any(d in clean for d in domains):
-                result.append(clean)
-    return list(dict.fromkeys(result))[:10]  # deduplicate, max 10
-
-
 # ── ARAÇ fiyat çekme ─────────────────────────────────────────────────────────
 
 def fetch_car_prices(brand: str, model: str, year: int) -> dict:
     """
-    arabam.com ve sahibinden.com'dan araç fiyatları çeker.
-    Min 10 kayıt hedefi, IQR outlier temizleme, ortalama/medyan döndürür.
-    """
-    sb = _slugify(brand)
-    sm = _slugify(model) if model else ""
-    all_prices: list[int] = []
-    used_urls: list[str] = []
+    Google/DDG'de arama yap, snippet'lerden fiyat çek, IQR uygula.
 
-    # 1. arabam.com doğrudan arama sayfaları
-    arabam_urls = [
-        f"https://www.arabam.com/ikinci-el/otomobil/{sb}-{sm}?minYear={year}&maxYear={year}",
-        f"https://www.arabam.com/ikinci-el/otomobil/{sb}-{sm}?minYear={year-1}&maxYear={year+1}",
-        f"https://www.arabam.com/ikinci-el/otomobil/{sb}?query={sm}&minYear={year}&maxYear={year}",
-        f"https://www.arabam.com/ikinci-el/otomobil/{sb}-{sm}",
+    Sorgular:
+      1. "{year} {brand} {model} ikinci el fiyat sahibinden arabam"
+      2. "site:sahibinden.com {year} {brand} {model} ikinci el"  (fallback)
+    """
+    all_prices: list[int] = []
+    queries = [
+        f"{year} {brand} {model} ikinci el fiyat sahibinden arabam",
+        f"site:sahibinden.com {year} {brand} {model} ikinci el",
+        f"site:arabam.com {year} {brand} {model}",
     ]
-    for url in arabam_urls:
-        html = _fetch(url)
+
+    for q in queries:
+        html = _fetch_search(q)
         if html:
-            prices = _extract_prices(html, 100_000, 25_000_000)
+            prices = _extract_prices(html, 100_000, 80_000_000)
             if prices:
                 all_prices.extend(prices)
-                used_urls.append(url)
-                print(f"[WEB] arabam {url[-50:]} → {len(prices)} fiyat")
+                print(f"[WEB] Araç query '{q[:50]}' → {len(prices)} fiyat")
         if len(set(all_prices)) >= 10:
             break
 
-    # 2. sahibinden.com doğrudan arama sayfaları
-    if len(set(all_prices)) < 10:
-        sahibinden_urls = [
-            f"https://www.sahibinden.com/otomobil?query={brand}+{model}&minYear={year}&maxYear={year}",
-            f"https://www.sahibinden.com/otomobil?query={brand}+{model}&minYear={year-1}&maxYear={year+1}",
-        ]
-        for url in sahibinden_urls:
-            html = _fetch(url)
-            if html:
-                prices = _extract_prices(html, 100_000, 25_000_000)
-                if prices:
-                    all_prices.extend(prices)
-                    used_urls.append(url)
-                    print(f"[WEB] sahibinden {url[-50:]} → {len(prices)} fiyat")
-            if len(set(all_prices)) >= 10:
-                break
-
-    # 3. DuckDuckGo arama → ek URL'ler
-    if len(set(all_prices)) < 5:
-        query = f"{year} {brand} {model} ikinci el fiyat arabam sahibinden"
-        extra_urls = _ddg_search_urls(query, ["arabam.com", "sahibinden.com"])
-        for url in extra_urls[:5]:
-            html = _fetch(url)
-            if html:
-                prices = _extract_prices(html, 100_000, 25_000_000)
-                if prices:
-                    all_prices.extend(prices)
-                    used_urls.append(url)
-                    print(f"[WEB] DDG extra → {len(prices)} fiyat")
-            if len(set(all_prices)) >= 10:
-                break
-
     unique = sorted(set(all_prices))
     if not unique:
-        return {"found": False, "prices": [], "avg": 0, "median": 0, "count": 0, "url": ""}
+        return {"found": False, "prices": [], "avg": 0, "median": 0, "count": 0}
 
     filtered = _remove_outliers(unique)
-    print(f"[WEB] Araç: {len(unique)} ham → {len(filtered)} temiz fiyat | ort={int(statistics.mean(filtered)):,} TL")
+    avg = int(statistics.mean(filtered))
+    med = int(statistics.median(filtered))
+
+    print(
+        f"[WEB] Araç sonuç: {len(unique)} ham → {len(filtered)} temiz | "
+        f"ort=₺{avg:,} | med=₺{med:,}"
+    )
 
     return {
         "found": True,
         "prices": filtered,
         "raw_count": len(unique),
         "filtered_count": len(filtered),
-        "avg": int(statistics.mean(filtered)),
-        "median": int(statistics.median(filtered)),
+        "avg": avg,
+        "median": med,
         "count": len(filtered),
-        "url": used_urls[0] if used_urls else "",
-        "sources": used_urls,
     }
 
 
@@ -215,82 +172,45 @@ def fetch_car_prices(brand: str, model: str, year: int) -> dict:
 
 def fetch_property_prices(city: str, district: str) -> dict:
     """
-    hepsiemlak.com ve sahibinden.com'dan konut fiyatları çeker.
-    IQR outlier temizleme, m² bazlı ortalama döndürür.
+    Google/DDG'de konut araması yap, snippet'lerden fiyat çek, IQR uygula.
     """
-    sc = _slugify(city)
-    sd = _slugify(district) if district else ""
     all_prices: list[int] = []
-    used_urls: list[str] = []
+    loc = f"{city} {district}".strip()
+    queries = [
+        f"{loc} satilik daire fiyat hepsiemlak sahibinden",
+        f"site:sahibinden.com {loc} satilik daire",
+        f"site:hepsiemlak.com {loc} satilik",
+    ]
 
-    # 1. hepsiemlak.com
-    he_urls = []
-    if sd:
-        he_urls.append(f"https://www.hepsiemlak.com/{sc}-{sd}-satilik-daire")
-        he_urls.append(f"https://www.hepsiemlak.com/{sc}-{sd}-satilik")
-    he_urls.append(f"https://www.hepsiemlak.com/{sc}-satilik-daire")
-    he_urls.append(f"https://www.hepsiemlak.com/{sc}-satilik")
-
-    for url in he_urls:
-        html = _fetch(url)
+    for q in queries:
+        html = _fetch_search(q)
         if html:
-            prices = _extract_prices(html, 500_000, 200_000_000)
+            prices = _extract_prices(html, 500_000, 500_000_000)
             if prices:
                 all_prices.extend(prices)
-                used_urls.append(url)
-                print(f"[WEB] hepsiemlak → {len(prices)} fiyat")
+                print(f"[WEB] Konut query '{q[:50]}' → {len(prices)} fiyat")
         if len(set(all_prices)) >= 10:
             break
 
-    # 2. sahibinden.com
-    if len(set(all_prices)) < 10:
-        sah_urls = []
-        if sd:
-            sah_urls.append(f"https://www.sahibinden.com/satilik-konut/{sc}/{sd}")
-        sah_urls.append(f"https://www.sahibinden.com/satilik-konut/{sc}")
-        sah_urls.append(f"https://www.sahibinden.com/satilik?query={city}+{district}+daire")
-
-        for url in sah_urls:
-            html = _fetch(url)
-            if html:
-                prices = _extract_prices(html, 500_000, 200_000_000)
-                if prices:
-                    all_prices.extend(prices)
-                    used_urls.append(url)
-                    print(f"[WEB] sahibinden konut → {len(prices)} fiyat")
-            if len(set(all_prices)) >= 10:
-                break
-
-    # 3. DuckDuckGo arama
-    if len(set(all_prices)) < 5:
-        query = f"{city} {district} satilik daire fiyat hepsiemlak sahibinden"
-        extra_urls = _ddg_search_urls(query, ["hepsiemlak.com", "sahibinden.com"])
-        for url in extra_urls[:5]:
-            html = _fetch(url)
-            if html:
-                prices = _extract_prices(html, 500_000, 200_000_000)
-                if prices:
-                    all_prices.extend(prices)
-                    used_urls.append(url)
-                    print(f"[WEB] DDG konut extra → {len(prices)} fiyat")
-            if len(set(all_prices)) >= 10:
-                break
-
     unique = sorted(set(all_prices))
     if not unique:
-        return {"found": False, "prices": [], "avg_total": 0, "median_total": 0, "count": 0, "url": ""}
+        return {"found": False, "prices": [], "avg_total": 0, "median_total": 0, "count": 0}
 
     filtered = _remove_outliers(unique)
-    print(f"[WEB] Konut: {len(unique)} ham → {len(filtered)} temiz | ort={int(statistics.mean(filtered)):,} TL")
+    avg = int(statistics.mean(filtered))
+    med = int(statistics.median(filtered))
+
+    print(
+        f"[WEB] Konut sonuç: {len(unique)} ham → {len(filtered)} temiz | "
+        f"ort=₺{avg:,} | med=₺{med:,}"
+    )
 
     return {
         "found": True,
         "prices": filtered,
         "raw_count": len(unique),
         "filtered_count": len(filtered),
-        "avg_total": int(statistics.mean(filtered)),
-        "median_total": int(statistics.median(filtered)),
+        "avg_total": avg,
+        "median_total": med,
         "count": len(filtered),
-        "url": used_urls[0] if used_urls else "",
-        "sources": used_urls,
     }
