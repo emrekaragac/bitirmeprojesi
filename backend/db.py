@@ -1,22 +1,25 @@
-import sqlite3
 import json
 import os
 from datetime import datetime
 
-DB_PATH = os.getenv("DB_PATH", "psds.db")
+import psycopg2
+import psycopg2.extras
+
+
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
 
 
 def init_db():
     conn = get_conn()
-    conn.execute("""
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS applications (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            id           SERIAL PRIMARY KEY,
             submitted_at TEXT NOT NULL,
             form_data    TEXT NOT NULL,
             scores       TEXT NOT NULL,
@@ -26,15 +29,18 @@ def init_db():
         )
     """)
     conn.commit()
+    cur.close()
     conn.close()
 
 
 def save_application(form_data: dict, scores: dict) -> int:
     conn = get_conn()
-    cur = conn.execute(
+    cur = conn.cursor()
+    cur.execute(
         """INSERT INTO applications
            (submitted_at, form_data, scores, total_score, priority, decision)
-           VALUES (?, ?, ?, ?, ?, ?)""",
+           VALUES (%s, %s, %s, %s, %s, %s)
+           RETURNING id""",
         (
             datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
             json.dumps(form_data, ensure_ascii=False),
@@ -44,17 +50,21 @@ def save_application(form_data: dict, scores: dict) -> int:
             scores.get("decision", ""),
         ),
     )
+    app_id = cur.fetchone()[0]
     conn.commit()
-    app_id = cur.lastrowid
+    cur.close()
     conn.close()
     return app_id
 
 
 def get_all_applications():
     conn = get_conn()
-    rows = conn.execute(
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
         "SELECT * FROM applications ORDER BY total_score DESC, submitted_at DESC"
-    ).fetchall()
+    )
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     result = []
     for r in rows:
@@ -88,9 +98,10 @@ def get_all_applications():
 
 def get_application(app_id: int):
     conn = get_conn()
-    row = conn.execute(
-        "SELECT * FROM applications WHERE id = ?", (app_id,)
-    ).fetchone()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("SELECT * FROM applications WHERE id = %s", (app_id,))
+    row = cur.fetchone()
+    cur.close()
     conn.close()
     if not row:
         return None

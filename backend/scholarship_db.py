@@ -1,37 +1,40 @@
-import sqlite3
 import json
 import os
 import uuid
 from datetime import datetime
 
-DB_PATH = os.getenv("DB_PATH", "psds.db")
+import psycopg2
+import psycopg2.extras
+
+
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
 
 
 def init_scholarship_db():
     conn = get_conn()
-    conn.execute("""
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS scholarships (
-            id              TEXT PRIMARY KEY,
-            name            TEXT NOT NULL,
-            description     TEXT,
-            slots           INTEGER DEFAULT 0,
-            deadline        TEXT,
-            type            TEXT NOT NULL DEFAULT 'financial',
+            id               TEXT PRIMARY KEY,
+            name             TEXT NOT NULL,
+            description      TEXT,
+            slots            INTEGER DEFAULT 0,
+            deadline         TEXT,
+            type             TEXT NOT NULL DEFAULT 'financial',
             financial_weight INTEGER DEFAULT 100,
             academic_weight  INTEGER DEFAULT 0,
-            config          TEXT NOT NULL,
-            created_at      TEXT NOT NULL
+            config           TEXT NOT NULL,
+            created_at       TEXT NOT NULL
         )
     """)
-    conn.execute("""
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS scholarship_applications (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            id              SERIAL PRIMARY KEY,
             scholarship_id  TEXT NOT NULL,
             submitted_at    TEXT NOT NULL,
             form_data       TEXT NOT NULL,
@@ -46,16 +49,18 @@ def init_scholarship_db():
         )
     """)
     conn.commit()
+    cur.close()
     conn.close()
 
 
 def create_scholarship(data: dict) -> str:
     sid = str(uuid.uuid4())[:8].upper()
     conn = get_conn()
-    conn.execute(
+    cur = conn.cursor()
+    cur.execute(
         """INSERT INTO scholarships
            (id, name, description, slots, deadline, type, financial_weight, academic_weight, config, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
         (
             sid,
             data.get("name", ""),
@@ -70,13 +75,17 @@ def create_scholarship(data: dict) -> str:
         ),
     )
     conn.commit()
+    cur.close()
     conn.close()
     return sid
 
 
 def get_scholarship(sid: str):
     conn = get_conn()
-    row = conn.execute("SELECT * FROM scholarships WHERE id = ?", (sid,)).fetchone()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("SELECT * FROM scholarships WHERE id = %s", (sid,))
+    row = cur.fetchone()
+    cur.close()
     conn.close()
     if not row:
         return None
@@ -96,7 +105,10 @@ def get_scholarship(sid: str):
 
 def get_all_scholarships():
     conn = get_conn()
-    rows = conn.execute("SELECT * FROM scholarships ORDER BY created_at DESC").fetchall()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("SELECT * FROM scholarships ORDER BY created_at DESC")
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     result = []
     for r in rows:
@@ -116,13 +128,15 @@ def get_all_scholarships():
 
 def save_scholarship_application(scholarship_id: str, form_data: dict, scores: dict, verification: dict = None) -> int:
     conn = get_conn()
+    cur = conn.cursor()
     ver = verification or {}
     trust_score  = ver.get("trust_score")
     needs_review = 1 if ver.get("needs_review") else 0
-    cur = conn.execute(
+    cur.execute(
         """INSERT INTO scholarship_applications
            (scholarship_id, submitted_at, form_data, scores, total_score, priority, decision, verification, trust_score, needs_review)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           RETURNING id""",
         (
             scholarship_id,
             datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
@@ -136,20 +150,24 @@ def save_scholarship_application(scholarship_id: str, form_data: dict, scores: d
             needs_review,
         ),
     )
+    app_id = cur.fetchone()[0]
     conn.commit()
-    app_id = cur.lastrowid
+    cur.close()
     conn.close()
     return app_id
 
 
 def get_scholarship_applications(scholarship_id: str):
     conn = get_conn()
-    rows = conn.execute(
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
         """SELECT * FROM scholarship_applications
-           WHERE scholarship_id = ?
+           WHERE scholarship_id = %s
            ORDER BY total_score DESC, submitted_at DESC""",
         (scholarship_id,),
-    ).fetchall()
+    )
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     result = []
     for r in rows:
@@ -178,9 +196,10 @@ def get_scholarship_applications(scholarship_id: str):
 
 def get_scholarship_application(app_id: int):
     conn = get_conn()
-    row = conn.execute(
-        "SELECT * FROM scholarship_applications WHERE id = ?", (app_id,)
-    ).fetchone()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("SELECT * FROM scholarship_applications WHERE id = %s", (app_id,))
+    row = cur.fetchone()
+    cur.close()
     conn.close()
     if not row:
         return None
