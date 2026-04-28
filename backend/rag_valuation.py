@@ -1,15 +1,14 @@
 """
 PSDS — Araç ve Konut Değerleme
-1. Claude (training knowledge) ile fiyat tahmini
+1. Claude web_search ile güncel piyasa fiyatı
 2. Fallback: marka/şehir bazlı formül
 """
 
 import os
 import re
 import datetime
+import statistics
 
-# ── Türkiye ikinci el araç referans fiyatları (2025 ortalama, TL) ─────────────
-# Bu fiyatlar fallback için — her zaman önce Claude'a sorulur
 _BRAND_BASE: dict[str, int] = {
     "fiat": 1_050_000, "dacia": 1_100_000, "renault": 1_300_000,
     "volkswagen": 1_950_000, "toyota": 1_800_000, "ford": 1_600_000,
@@ -32,158 +31,190 @@ _CITY_M2: dict[str, int] = {
     "default": 20_000,
 }
 
+_PRICE_RE = [
+    r'(\d{1,3}(?:\.\d{3})+)\s*(?:TL|₺)',
+    r'(?:TL|₺)\s*(\d{1,3}(?:\.\d{3})+)',
+    r'(\d{1,3}(?:,\d{3})+)\s*(?:TL|₺)',
+]
 
-def _ask_claude(prompt: str) -> str:
+
+def _extract_prices(text: str, min_val: int, max_val: int) -> list[int]:
+    found: set[int] = set()
+    for pat in _PRICE_RE:
+        for tok in re.findall(pat, text, re.IGNORECASE):
+            clean = tok.replace(".", "").replace(",", "")
+            try:
+                v = int(clean)
+                if min_val <= v <= max_val:
+                    found.add(v)
+            except ValueError:
+                pass
+    return sorted(found)
+
+
+def _run_web_search(
+    client,
+    model: str,
+    prompt: str,
+    max_turns: int = 3,
+    max_uses: int = 3,
+) -> str:
     """
-    Claude'a direkt sor — web_search tool kullanma, training knowledge'dan cevap ver.
-    Model sırası: haiku-4-5 → 3-5-haiku → sonnet-4-5
+    Anthropic'in server-side managed `web_search_20250305` tool'unu kullanır.
+    Aramayı Anthropic sunucusu çalıştırır; istemci tool_result yollamaz.
+    stop_reason 'pause_turn' ise aynı mesajla devam et.
+    """
+    tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": max_uses}]
+    messages = [{"role": "user", "content": prompt}]
+    full_text = ""
+
+    for _ in range(max_turns):
+        resp = client.messages.create(
+            model=model,
+            max_tokens=2048,
+            tools=tools,
+            messages=messages,
+        )
+        for block in resp.content:
+            text = getattr(block, "text", None)
+            if text:
+                full_text += text
+
+        if resp.stop_reason == "pause_turn":
+            messages.append({"role": "assistant", "content": resp.content})
+            continue
+
+        break
+
+    return full_text
+
+
+def _live_search_price(brand: str, model: str, year: int, has_damage: bool) -> dict | None:
+    """
+    Claude web_search ile güncel Türkiye ikinci el piyasa fiyatı.
+    Claude hem web araması yapar hem bilgisiyle değerlendirir.
     """
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        return ""
+        return None
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
 
-        models = [
-            "claude-haiku-4-5-20251001",
-            "claude-3-5-haiku-20241022",
-            "claude-sonnet-4-5-20251001",
-        ]
-        for model_name in models:
-            try:
-                resp = client.messages.create(
-                    model=model_name,
-                    max_tokens=60,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                text = ""
-                for block in resp.content:
-                    if hasattr(block, "text"):
-                        text += block.text
-                if text.strip():
-                    print(f"[RAG] Model={model_name} | Yanıt: {text[:200]}")
-                    return text
-            except Exception as model_err:
-                print(f"[RAG] Model {model_name} hata: {model_err}")
-                continue
+        hasar = "Hasar kaydı var, fiyata yansıt." if has_damage else ""
+        prompt = (
+            f"'{year} {brand} {model} ikinci el türkiye' diye ara. "
+            f"Arama sonuçları ve bilgine dayanarak bu aracın 2025 Türkiye "
+            f"ikinci el ortalama piyasa değerini ver. {hasar} "
+            f"Sadece şunu yaz, başka hiçbir şey yazma:\n"
+            f"FIYAT: 1.250.000 TL"
+        )
+
+        full_text = _run_web_search(client, "claude-haiku-4-5-20251001", prompt)
+        print(f"[RAG] Claude yanıtı: {full_text[:300]}")
+
+        m = re.search(r'FIYAT[:\s]+(\d[\d.]+)\s*TL', full_text, re.IGNORECASE)
+        if m:
+            val = int(m.group(1).replace(".", ""))
+        else:
+            prices = _extract_prices(full_text, 50_000, 100_000_000)
+            if not prices:
+                return None
+            val = prices[len(prices) // 2]
+
+        if not (50_000 <= val <= 100_000_000):
+            return None
+
+        return {
+            "rag_used": True,
+            "estimated_car_value": val,
+            "confidence": "medium",
+            "reasoning": f"{year} {brand} {model} güncel piyasa değeri.",
+            "source": "Claude web_search",
+        }
     except Exception as e:
-        print(f"[RAG] Claude API error: {e}")
-    return ""
+        print(f"[RAG] Live search error: {e}")
+    return None
 
-
-# ── ARAÇ fiyat tahmini ────────────────────────────────────────────────────────
-
-def _live_search_price(brand: str, model: str, year: int, has_damage: bool) -> dict | None:
-    """Claude'un bilgisinden Türkiye ikinci el araç fiyatı."""
-    hasar = "Hasar kaydı var, %15-20 değer düşüklüğünü fiyata yansıt." if has_damage else "Hasar yok."
-    prompt = (
-        f"Türkiye ikinci el araç piyasasında {year} model {brand} {model} aracının "
-        f"2025-2026 yılı gerçekçi ortalama ikinci el satış fiyatı nedir? "
-        f"{hasar} "
-        f"Türkiye'deki yüksek enflasyon, döviz kuru ve arz-talep dengesini göz önünde bulundur. "
-        f"SADECE şu formatta yaz, başka hiçbir şey yazma:\n"
-        f"FIYAT: 1.250.000 TL"
-    )
-
-    text = _ask_claude(prompt)
-    if not text:
-        return None
-
-    m = re.search(r'FIYAT[:\s]+(\d[\d.,]+)\s*(?:TL|₺)?', text, re.IGNORECASE)
-    if not m:
-        return None
-
-    try:
-        val = int(m.group(1).replace(".", "").replace(",", ""))
-    except ValueError:
-        return None
-
-    if not (100_000 <= val <= 100_000_000):
-        return None
-
-    return {
-        "rag_used": True,
-        "estimated_car_value": val,
-        "confidence": "medium",
-        "reasoning": f"{year} {brand} {model} Claude bilgi tahmini.",
-        "source": "Claude AI",
-    }
-
-
-# ── KONUT fiyat tahmini ───────────────────────────────────────────────────────
 
 def _live_search_property(city: str, district: str, square_meters: float) -> dict | None:
-    """Claude'un bilgisinden Türkiye konut fiyatı."""
-    loc = f"{city} {district}".strip()
-    prompt = (
-        f"Türkiye'de {loc} bölgesinde {square_meters} m² dairenin "
-        f"2025-2026 yılı gerçekçi ortalama satış fiyatı nedir? "
-        f"Türkiye'deki yüksek enflasyon ve bölgesel fiyat farklarını göz önünde bulundur. "
-        f"SADECE şu formatta yaz, başka hiçbir şey yazma:\n"
-        f"FIYAT: 4.500.000 TL"
-    )
-
-    text = _ask_claude(prompt)
-    if not text:
+    """Claude web_search ile güncel Türkiye konut piyasa fiyatı."""
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
         return None
-
-    m = re.search(r'FIYAT[:\s]+(\d[\d.,]+)\s*(?:TL|₺)?', text, re.IGNORECASE)
-    if not m:
-        return None
-
     try:
-        val = int(m.group(1).replace(".", "").replace(",", ""))
-    except ValueError:
-        return None
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
 
-    if not (200_000 <= val <= 500_000_000):
-        return None
+        loc = f"{city} {district}".strip()
+        prompt = (
+            f"'{loc} satılık daire' diye ara. "
+            f"Arama sonuçları ve bilgine dayanarak {loc} bölgesinde "
+            f"{square_meters} m² dairenin 2025 Türkiye ortalama piyasa değerini ver. "
+            f"Sadece şunu yaz, başka hiçbir şey yazma:\n"
+            f"FIYAT: 4.500.000 TL"
+        )
 
-    m2p = round(val / max(square_meters, 1))
-    return {
-        "rag_used": True,
-        "property_estimated_value": val,
-        "avg_m2_price": m2p,
-        "confidence": "medium",
-        "reasoning": f"{loc} {square_meters}m² Claude bilgi tahmini.",
-        "source": "Claude AI",
-    }
+        full_text = _run_web_search(client, "claude-haiku-4-5-20251001", prompt)
+        print(f"[RAG] Konut Claude yanıtı: {full_text[:300]}")
+
+        m = re.search(r'FIYAT[:\s]+(\d[\d.]+)\s*TL', full_text, re.IGNORECASE)
+        if m:
+            val = int(m.group(1).replace(".", ""))
+        else:
+            prices = _extract_prices(full_text, 200_000, 500_000_000)
+            if not prices:
+                return None
+            val = prices[len(prices) // 2]
+
+        if not (200_000 <= val <= 500_000_000):
+            return None
+
+        m2p = round(val / max(square_meters, 1))
+        return {
+            "rag_used": True,
+            "property_estimated_value": val,
+            "avg_m2_price": m2p,
+            "confidence": "medium",
+            "reasoning": f"{loc} {square_meters}m² güncel piyasa değeri.",
+            "source": "Claude web_search",
+        }
+    except Exception as e:
+        print(f"[RAG] Live property search error: {e}")
+    return None
 
 
-# ── ARAÇ TAHMİNİ (public) ────────────────────────────────────────────────────
+# ── ARAÇ TAHMİNİ ─────────────────────────────────────────────────────────────
 def rag_estimate_car(
     brand: str, model: str, year: int,
     has_damage: bool = False, ocr_text: str = "",
 ) -> dict:
     damage_factor = 0.82 if has_damage else 1.0
 
-    # 1. Claude bilgisinden fiyat
+    # 1. Claude web_search
     live = _live_search_price(brand, model, year, has_damage)
     if live:
         return live
 
     # 2. Marka bazlı formül (fallback)
-    # Türkiye'de yüksek enflasyon nedeniyle eski araçlar daha az değer kaybeder
-    # Min %40 taban değer, yıllık %8 değer kaybı
     age = max(0, datetime.datetime.now().year - int(year))
     base = _BRAND_BASE.get(brand.lower(), _BRAND_BASE["default"])
-    dep = max(0.40, (1 - 0.08) ** age)
+    dep = max(0.25, (1 - 0.10) ** age)
     val = round(base * dep * damage_factor)
     return {
         "rag_used": False,
         "estimated_car_value": val,
         "confidence": "low",
-        "reasoning": f"{brand} marka bazlı formül ({age} yıl, dep={dep:.2f}).",
+        "reasoning": f"{brand} marka bazlı formül ({age} yıl).",
         "source": "marka bazlı formül",
     }
 
 
-# ── EMLAK TAHMİNİ (public) ───────────────────────────────────────────────────
+# ── EMLAK TAHMİNİ ─────────────────────────────────────────────────────────────
 def rag_estimate_property(
     city: str, district: str, square_meters: float, ocr_text: str = "",
 ) -> dict:
-    # 1. Claude bilgisinden fiyat
+    # 1. Claude web_search
     live = _live_search_property(city, district, square_meters)
     if live:
         return live
