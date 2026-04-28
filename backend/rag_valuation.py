@@ -232,12 +232,35 @@ def rag_estimate_car(
     brand: str, model: str, year: int,
     has_damage: bool = False, ocr_text: str = "",
 ) -> dict:
-    # 1. Canlı web araması
+    import statistics as _stats
+
+    # 1. Doğrudan web scraping (arabam.com + sahibinden.com + DuckDuckGo)
+    try:
+        from backend.web_retrieval import fetch_car_prices
+        scraped = fetch_car_prices(brand, model, year)
+        if scraped.get("found") and scraped.get("count", 0) >= 3:
+            val = int(scraped["median"] * (0.82 if has_damage else 1.0))
+            return {
+                "rag_used": True,
+                "estimated_car_value": val,
+                "confidence": "high" if scraped["count"] >= 10 else "medium",
+                "reasoning": (
+                    f"arabam.com/sahibinden.com: {scraped['raw_count']} ilan bulundu, "
+                    f"{scraped['filtered_count']} outlier temizlendi, "
+                    f"medyan ₺{scraped['median']:,}."
+                ),
+                "source": "web scraping (arabam/sahibinden)",
+                "price_list": scraped["prices"][:10],
+            }
+    except Exception as e:
+        print(f"[RAG] Scraping error: {e}")
+
+    # 2. Claude web_search (scraping başarısız olursa)
     live = _live_search_price(brand, model, year, has_damage)
     if live:
         return live
 
-    # 2. Model fiyat tablosu
+    # 3. Model fiyat tablosu
     ref_price = _lookup_model_price(brand, model, year)
     if ref_price:
         damage_factor = 0.82 if has_damage else 1.0
@@ -250,7 +273,7 @@ def rag_estimate_car(
             "source": "model fiyat tablosu",
         }
 
-    # 3. Marka bazlı formül
+    # 4. Marka bazlı formül
     age = max(0, datetime.datetime.now().year - int(year))
     base = _BRAND_BASE.get(brand.lower(), _BRAND_BASE["default"])
     dep = max(0.25, (1 - 0.10) ** age)
@@ -268,12 +291,36 @@ def rag_estimate_car(
 def rag_estimate_property(
     city: str, district: str, square_meters: float, ocr_text: str = "",
 ) -> dict:
-    # 1. Canlı web araması
+    # 1. Doğrudan web scraping (hepsiemlak.com + sahibinden.com + DuckDuckGo)
+    try:
+        from backend.web_retrieval import fetch_property_prices
+        scraped = fetch_property_prices(city, district)
+        if scraped.get("found") and scraped.get("count", 0) >= 3:
+            avg_total = scraped["median_total"]
+            m2p = round(avg_total / max(square_meters, 1))
+            total = round(avg_total if square_meters <= 1 else m2p * square_meters)
+            return {
+                "rag_used": True,
+                "property_estimated_value": total,
+                "avg_m2_price": m2p,
+                "confidence": "high" if scraped["count"] >= 10 else "medium",
+                "reasoning": (
+                    f"hepsiemlak/sahibinden: {scraped['raw_count']} ilan, "
+                    f"{scraped['filtered_count']} temiz, "
+                    f"medyan ₺{scraped['median_total']:,} → {square_meters}m² × ₺{m2p:,}/m²."
+                ),
+                "source": "web scraping (hepsiemlak/sahibinden)",
+                "price_list": scraped["prices"][:10],
+            }
+    except Exception as e:
+        print(f"[RAG] Property scraping error: {e}")
+
+    # 2. Claude web_search
     live = _live_search_property(city, district, square_meters)
     if live:
         return live
 
-    # 2. Şehir bazlı formül
+    # 3. Şehir bazlı formül
     city_norm = city.lower()
     for tr, en in zip("çğışöüÇĞİŞÖÜ", "cgisouCGISOu"):
         city_norm = city_norm.replace(tr, en)
