@@ -111,7 +111,7 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             return {"valid": True, "message": f"✅ Geçerli {sig['name']} tespit edildi.",
                     "confidence": round(hits / len(sig["keywords"]), 2), "hits": hits}
 
-        # Keyword eşleşmedi ama metin var → hangi belge olduğunu bul
+        # Başka belge türü mü?
         best_other = None
         for doc_id, other_sig in DOC_SIGNATURES.items():
             if doc_id == expected_doc_id:
@@ -120,11 +120,14 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
                 best_other = other_sig["name"]
                 break
 
-        msg = (f"❌ Yüklenen dosya '{best_other}' gibi görünüyor. Lütfen geçerli bir {sig['name']} yükleyin."
-               if best_other else f"❌ Bu belgenin {sig['name']} olduğu doğrulanamadı.")
-        return {"valid": False, "message": msg, "confidence": 0.0, "hits": hits}
+        if best_other:
+            return {"valid": False,
+                    "message": f"❌ Yüklenen dosya '{best_other}' gibi görünüyor. Lütfen geçerli bir {sig['name']} yükleyin.",
+                    "confidence": 0.0, "hits": hits}
 
-    # 2. Metin yok → Claude Vision
+        # Keyword eşleşmedi ama başka belge de değil → bozuk OCR katmanı olabilir, Vision'a geç
+
+    # 2. Metin yok veya keyword eşleşmedi → Claude Vision
     try:
         if expected_doc_id == "car_file":
             result = analyze_car(file_path)
