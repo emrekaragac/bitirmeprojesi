@@ -126,45 +126,32 @@ def debug_system():
 # ─────────────────────────────────────────────────────────────
 
 @app.get("/debug-price")
-def debug_price(brand: str = "mercedes-benz", model: str = "S400d", year: int = 2022):
+def debug_price(brand: str = "mini", model: str = "Cooper S", year: int = 2010):
     """Araç fiyat tahmin pipeline'ını adım adım test eder."""
-    from backend.rag_valuation import (
-        _lookup_model_price, _live_search_price, rag_estimate_car,
-        _run_web_search, _extract_prices
-    )
-    import os, anthropic as _anthropic
+    from backend.rag_valuation import _live_search_price, rag_estimate_car, _ask_claude
 
     result: dict = {"brand": brand, "model": model, "year": year}
 
-    # 1. Model tablosu
-    ref = _lookup_model_price(brand, model, year)
-    result["model_table_price"] = f"₺{ref:,}" if ref else "bulunamadı"
-
-    # 2. Web search ham yanıt
+    # 1. Claude ham yanıt
     try:
-        api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        client = _anthropic.Anthropic(api_key=api_key)
         prompt = (
-            f"'{year} {brand} {model} ikinci el fiyat' diye Türkiye'de web araması yap. "
-            f"Arama sonuçlarında gördüğün TL fiyatlarını SADECE listele, "
-            f"yorum yapma, tahmin yapma. Her fiyat ayrı satırda."
+            f"Türkiye ikinci el araç piyasasında {year} model {brand} {model} aracının "
+            f"2025-2026 yılı gerçekçi ortalama ikinci el satış fiyatı nedir? "
+            f"SADECE şu formatta yaz: FIYAT: 1.250.000 TL"
         )
-        raw_text = _run_web_search(client, "claude-haiku-4-5-20251001", prompt)
-        prices = _extract_prices(raw_text, 50_000, 100_000_000)
-        result["web_search_raw"] = raw_text[:600]
-        result["web_search_prices"] = prices
+        raw = _ask_claude(prompt)
+        result["claude_raw"] = raw
     except Exception as e:
-        result["web_search_raw"] = f"hata: {e}"
-        result["web_search_prices"] = []
+        result["claude_raw"] = f"hata: {e}"
 
-    # 3. Live search sonucu
+    # 2. Live search sonucu
     try:
         live = _live_search_price(brand, model, year, has_damage=False)
         result["live_search"] = live if live else "None döndü"
     except Exception as e:
         result["live_search"] = f"hata: {e}"
 
-    # 4. Nihai sonuç
+    # 3. Nihai sonuç
     try:
         final = rag_estimate_car(brand, model, year, has_damage=False)
         result["final_estimate"] = final
