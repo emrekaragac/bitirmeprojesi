@@ -95,19 +95,67 @@ def _lookup_model_price(brand: str, model: str, year: int) -> int | None:
 
 
 def _parse_json(text: str) -> dict | None:
-    try:
-        m = re.search(r'\{[^{}]*\}', text, re.DOTALL)
-        return json.loads(m.group()) if m else None
-    except Exception:
+    """İlk geçerli JSON objesini metinden çıkar (nested destekli)."""
+    start = text.find('{')
+    if start == -1:
         return None
+    depth = 0
+    for i, ch in enumerate(text[start:], start):
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(text[start:i + 1])
+                except Exception:
+                    return None
+    return None
+
+
+def _run_web_search(client, model: str, user_prompt: str, max_turns: int = 5) -> str:
+    """
+    web_search_20250305 tool ile çok turlu konuşma yürütür.
+    tool_use → tool_result döngüsünü yönetir, son metin yanıtını döner.
+    """
+    tools = [{"type": "web_search_20250305", "name": "web_search"}]
+    messages = [{"role": "user", "content": user_prompt}]
+    full_text = ""
+
+    for _ in range(max_turns):
+        resp = client.messages.create(
+            model=model,
+            max_tokens=1024,
+            tools=tools,
+            messages=messages,
+        )
+
+        for block in resp.content:
+            if hasattr(block, "text"):
+                full_text += block.text
+
+        if resp.stop_reason == "end_turn":
+            break
+
+        if resp.stop_reason == "tool_use":
+            tool_results = [
+                {"type": "tool_result", "tool_use_id": block.id, "content": ""}
+                for block in resp.content
+                if hasattr(block, "type") and block.type == "tool_use"
+            ]
+            messages.append({"role": "assistant", "content": resp.content})
+            if tool_results:
+                messages.append({"role": "user", "content": tool_results})
+            else:
+                break
+        else:
+            break
+
+    return full_text
 
 
 # ── Canlı web araması ile fiyat çekme ────────────────────────────────────────
 def _live_search_price(brand: str, model: str, year: int, has_damage: bool) -> dict | None:
-    """
-    Claude'un web_search tool'u ile arabam.com / sahibinden.com'dan
-    gerçek zamanlı fiyat çeker.
-    """
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         return None
@@ -115,30 +163,16 @@ def _live_search_price(brand: str, model: str, year: int, has_damage: bool) -> d
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
 
-        search_query = f"{year} {brand} {model} ikinci el fiyat Türkiye 2025"
-        user_prompt = f"""arabam.com veya sahibinden.com üzerinde şu aracın güncel Türkiye ikinci el satış fiyatını ara:
-
-Araç: {year} model {brand} {model}
-{"Hasar kaydı var." if has_damage else "Hasar kaydı yok."}
-
-Arama yap, ilanlardan ortalama/tipik fiyatı bul ve SADECE şu JSON formatında döndür:
-{{"estimated_value": <TL tam sayı>, "confidence": "low"/"medium"/"high", "reasoning": "<nereden bulduğunu 1 cümle Türkçe açıkla>"}}"""
-
-        resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            tools=[{"type": "web_search_20250305", "name": "web_search"}],
-            messages=[{"role": "user", "content": user_prompt}],
+        user_prompt = (
+            f"{year} model {brand} {model} aracının güncel Türkiye ikinci el piyasa fiyatını "
+            f"arabam.com veya sahibinden.com'dan ara. "
+            f"{'Hasar kaydı var.' if has_damage else 'Hasar kaydı yok.'} "
+            f"Bulduğun fiyatlara göre SADECE şu JSON formatında yanıt ver (başka hiçbir şey yazma): "
+            f'{{"estimated_value": <TL tam sayı>, "confidence": "low"/"medium"/"high", '
+            f'"reasoning": "<kaynağını 1 cümle Türkçe>"}}'
         )
 
-        # Tool çağrısı + metin içeren yanıtı topla
-        full_text = ""
-        for block in resp.content:
-            if hasattr(block, "text"):
-                full_text += block.text
-
-        if not full_text:
-            return None
+        full_text = _run_web_search(client, "claude-haiku-4-5-20251001", user_prompt)
 
         parsed = _parse_json(full_text)
         if parsed and "estimated_value" in parsed:
@@ -157,7 +191,6 @@ Arama yap, ilanlardan ortalama/tipik fiyatı bul ve SADECE şu JSON formatında 
 
 
 def _live_search_property(city: str, district: str, square_meters: float) -> dict | None:
-    """hepsiemlak / sahibinden'den konut fiyatı çeker."""
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         return None
@@ -165,27 +198,16 @@ def _live_search_property(city: str, district: str, square_meters: float) -> dic
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
 
-        user_prompt = f"""hepsiemlak.com veya sahibinden.com üzerinde şu konutun güncel Türkiye satış fiyatını ara:
-
-Konut: {city} / {district or "merkez"} — {square_meters} m²
-
-Arama yap, benzer ilanlardan m² fiyatını ve toplam değeri bul. SADECE JSON döndür:
-{{"estimated_value": <TL toplam>, "price_per_m2": <TL/m²>, "confidence": "low"/"medium"/"high", "reasoning": "<kaynağını 1 cümle Türkçe>"}}"""
-
-        resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            tools=[{"type": "web_search_20250305", "name": "web_search"}],
-            messages=[{"role": "user", "content": user_prompt}],
+        user_prompt = (
+            f"{city} / {district or 'merkez'} bölgesinde {square_meters} m² konutun güncel "
+            f"Türkiye satış fiyatını hepsiemlak.com veya sahibinden.com'dan ara. "
+            f"Benzer ilanlardan m² fiyatını ve toplam değeri bul. "
+            f"SADECE şu JSON formatında yanıt ver (başka hiçbir şey yazma): "
+            f'{{"estimated_value": <TL toplam tam sayı>, "price_per_m2": <TL/m² tam sayı>, '
+            f'"confidence": "low"/"medium"/"high", "reasoning": "<kaynağını 1 cümle Türkçe>"}}'
         )
 
-        full_text = ""
-        for block in resp.content:
-            if hasattr(block, "text"):
-                full_text += block.text
-
-        if not full_text:
-            return None
+        full_text = _run_web_search(client, "claude-haiku-4-5-20251001", user_prompt)
 
         parsed = _parse_json(full_text)
         if parsed and "estimated_value" in parsed:
