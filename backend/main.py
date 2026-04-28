@@ -145,8 +145,8 @@ def debug_price(brand: str = "mercedes-benz", model: str = "S400d", year: int = 
         api_key = os.getenv("ANTHROPIC_API_KEY", "")
         client = _anthropic.Anthropic(api_key=api_key)
         prompt = (
-            f"Sahibinden.com'da '{year} {brand} {model} ikinci el' ara. "
-            f"Arama sonuçlarında gördüğün ilan fiyatlarını (TL) SADECE listele, "
+            f"'{year} {brand} {model} ikinci el fiyat' diye Türkiye'de web araması yap. "
+            f"Arama sonuçlarında gördüğün TL fiyatlarını SADECE listele, "
             f"yorum yapma, tahmin yapma. Her fiyat ayrı satırda."
         )
         raw_text = _run_web_search(client, "claude-haiku-4-5-20251001", prompt)

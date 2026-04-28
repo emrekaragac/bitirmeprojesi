@@ -242,9 +242,9 @@ def _live_search_price(brand: str, model: str, year: int, has_damage: bool) -> d
         client = anthropic.Anthropic(api_key=api_key)
 
         prompt = (
-            f"Sahibinden.com'da '{year} {brand} {model} ikinci el' ara. "
-            f"Arama sonuçlarında gördüğün ilan fiyatlarını (TL) SADECE listele, "
-            f"yorum yapma, tahmin yapma, açıklama yazma. Her fiyat ayrı satırda:\n"
+            f"'{year} {brand} {model} ikinci el fiyat' diye Türkiye'de web araması yap. "
+            f"Arama sonuçlarında gördüğün TL fiyatlarını SADECE listele, "
+            f"yorum yapma, tahmin yapma. Her fiyat ayrı satırda:\n"
             f"12.249.900 TL\n11.500.000 TL\n13.750.000 TL"
         )
 
@@ -287,8 +287,8 @@ def _live_search_property(city: str, district: str, square_meters: float) -> dic
 
         loc = f"{city} {district}".strip()
         prompt = (
-            f"Sahibinden.com'da '{loc} satılık daire' ara. "
-            f"Arama sonuçlarında gördüğün ilan fiyatlarını (TL) SADECE listele, "
+            f"'{loc} satılık daire fiyat' diye Türkiye'de web araması yap. "
+            f"Arama sonuçlarında gördüğün TL fiyatlarını SADECE listele, "
             f"yorum yapma, tahmin yapma. Her fiyat ayrı satırda:\n"
             f"4.500.000 TL\n3.800.000 TL\n5.200.000 TL"
         )
