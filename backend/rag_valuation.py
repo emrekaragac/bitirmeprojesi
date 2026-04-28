@@ -40,13 +40,25 @@ _MODEL_PRICES: dict[str, dict[int, int]] = {
     "honda|civic":        {2015: 570_000, 2017: 720_000, 2019: 920_000, 2021: 1_250_000, 2023: 1_700_000, 2025: 2_200_000},
     "bmw|3 serisi":       {2015: 950_000, 2017: 1_250_000, 2019: 1_650_000, 2021: 2_300_000, 2023: 3_300_000, 2025: 4_500_000},
     "bmw|5 serisi":       {2015: 1_300_000, 2017: 1_700_000, 2019: 2_200_000, 2021: 3_100_000, 2023: 4_500_000, 2025: 6_200_000},
+    "bmw|7 serisi":       {2015: 2_000_000, 2017: 2_700_000, 2019: 3_800_000, 2021: 5_500_000, 2023: 8_500_000, 2025: 12_000_000},
     "bmw|x3":             {2015: 1_100_000, 2017: 1_400_000, 2019: 1_850_000, 2021: 2_600_000, 2023: 3_800_000, 2025: 5_100_000},
+    "bmw|x5":             {2015: 1_800_000, 2017: 2_300_000, 2019: 3_200_000, 2021: 4_800_000, 2023: 7_000_000, 2025: 9_500_000},
     "mercedes-benz|c serisi": {2015: 1_050_000, 2017: 1_380_000, 2019: 1_850_000, 2021: 2_600_000, 2023: 3_800_000, 2025: 5_200_000},
     "mercedes-benz|e serisi": {2015: 1_450_000, 2017: 1_900_000, 2019: 2_550_000, 2021: 3_600_000, 2023: 5_200_000, 2025: 7_200_000},
+    "mercedes-benz|s serisi": {2018: 3_000_000, 2019: 4_000_000, 2020: 6_000_000, 2021: 8_500_000, 2022: 12_500_000, 2023: 16_000_000, 2025: 22_000_000},
+    "mercedes-benz|gle":  {2016: 1_800_000, 2018: 2_500_000, 2020: 4_000_000, 2022: 6_500_000, 2024: 9_000_000},
+    "mercedes-benz|gls":  {2018: 3_500_000, 2020: 5_500_000, 2022: 9_000_000, 2024: 13_000_000},
     "audi|a3":            {2015: 750_000, 2017: 970_000, 2019: 1_280_000, 2021: 1_800_000, 2023: 2_600_000, 2025: 3_500_000},
     "audi|a4":            {2015: 950_000, 2017: 1_250_000, 2019: 1_650_000, 2021: 2_350_000, 2023: 3_400_000, 2025: 4_600_000},
+    "audi|a6":            {2015: 1_300_000, 2017: 1_700_000, 2019: 2_300_000, 2021: 3_300_000, 2023: 5_000_000, 2025: 7_000_000},
+    "audi|q5":            {2016: 1_400_000, 2018: 1_900_000, 2020: 2_800_000, 2022: 4_200_000, 2024: 6_000_000},
     "suzuki|swift":       {2015: 380_000, 2017: 480_000, 2019: 620_000, 2021: 830_000, 2023: 1_100_000, 2025: 1_400_000},
     "suzuki|vitara":      {2015: 560_000, 2017: 720_000, 2019: 930_000, 2021: 1_250_000, 2023: 1_700_000, 2025: 2_200_000},
+    "land rover|defender":{2019: 3_000_000, 2020: 4_500_000, 2021: 6_000_000, 2022: 8_000_000, 2023: 10_000_000, 2025: 13_000_000},
+    "land rover|discovery":{2018: 2_500_000, 2020: 3_800_000, 2022: 6_500_000, 2024: 9_000_000},
+    "land rover|range rover":{2018: 3_500_000, 2020: 6_000_000, 2022: 10_000_000, 2024: 15_000_000},
+    "porsche|cayenne":    {2016: 2_000_000, 2018: 3_000_000, 2020: 5_000_000, 2022: 8_000_000, 2024: 12_000_000},
+    "porsche|macan":      {2016: 1_500_000, 2018: 2_200_000, 2020: 3_500_000, 2022: 5_500_000, 2024: 8_000_000},
     "togg|t10x":          {2023: 1_350_000, 2024: 1_600_000, 2025: 1_850_000},
 }
 
@@ -74,13 +86,36 @@ _CITY_M2: dict[str, int] = {
 
 
 def _lookup_model_price(brand: str, model: str, year: int) -> int | None:
-    key = f"{brand.lower()}|{model.lower()}"
+    brand_l = brand.lower().replace("_", "-")
+    model_l = model.lower().strip()
+
+    # Tam eşleşme
+    key = f"{brand_l}|{model_l}"
     table = _MODEL_PRICES.get(key)
+
     if not table:
         for k, v in _MODEL_PRICES.items():
-            if k.startswith(brand.lower() + "|") and model.lower().split()[0] in k:
+            kb, km = k.split("|", 1)
+            # Marka kontrolü (mercedes-benz, mercedes her ikisi de eşleşsin)
+            brand_match = (
+                brand_l == kb
+                or brand_l.startswith(kb)
+                or kb.startswith(brand_l.split("-")[0])
+            )
+            if not brand_match:
+                continue
+            # Model kontrolü: model'in ilk harfi/kelimesi tablo anahtarıyla örtüşüyor mu?
+            model_first = model_l.split()[0] if model_l else ""
+            km_first = km.split()[0] if km else ""
+            if (
+                model_l in km
+                or km in model_l
+                or model_first == km_first
+                or (len(model_first) >= 1 and model_first[0] == km_first[0] and len(km_first) >= 1)
+            ):
                 table = v
                 break
+
     if not table:
         return None
     years = sorted(table.keys())
@@ -232,30 +267,7 @@ def rag_estimate_car(
     brand: str, model: str, year: int,
     has_damage: bool = False, ocr_text: str = "",
 ) -> dict:
-    import statistics as _stats
-
-    # 1. Doğrudan web scraping (arabam.com + sahibinden.com + DuckDuckGo)
-    try:
-        from backend.web_retrieval import fetch_car_prices
-        scraped = fetch_car_prices(brand, model, year)
-        if scraped.get("found") and scraped.get("count", 0) >= 3:
-            val = int(scraped["median"] * (0.82 if has_damage else 1.0))
-            return {
-                "rag_used": True,
-                "estimated_car_value": val,
-                "confidence": "high" if scraped["count"] >= 10 else "medium",
-                "reasoning": (
-                    f"arabam.com/sahibinden.com: {scraped['raw_count']} ilan bulundu, "
-                    f"{scraped['filtered_count']} outlier temizlendi, "
-                    f"medyan ₺{scraped['median']:,}."
-                ),
-                "source": "web scraping (arabam/sahibinden)",
-                "price_list": scraped["prices"][:10],
-            }
-    except Exception as e:
-        print(f"[RAG] Scraping error: {e}")
-
-    # 2. Claude web_search (scraping başarısız olursa)
+    # 1. Claude web_search ile gerçek zamanlı fiyat (primary)
     live = _live_search_price(brand, model, year, has_damage)
     if live:
         return live
@@ -291,31 +303,7 @@ def rag_estimate_car(
 def rag_estimate_property(
     city: str, district: str, square_meters: float, ocr_text: str = "",
 ) -> dict:
-    # 1. Doğrudan web scraping (hepsiemlak.com + sahibinden.com + DuckDuckGo)
-    try:
-        from backend.web_retrieval import fetch_property_prices
-        scraped = fetch_property_prices(city, district)
-        if scraped.get("found") and scraped.get("count", 0) >= 3:
-            avg_total = scraped["median_total"]
-            m2p = round(avg_total / max(square_meters, 1))
-            total = round(avg_total if square_meters <= 1 else m2p * square_meters)
-            return {
-                "rag_used": True,
-                "property_estimated_value": total,
-                "avg_m2_price": m2p,
-                "confidence": "high" if scraped["count"] >= 10 else "medium",
-                "reasoning": (
-                    f"hepsiemlak/sahibinden: {scraped['raw_count']} ilan, "
-                    f"{scraped['filtered_count']} temiz, "
-                    f"medyan ₺{scraped['median_total']:,} → {square_meters}m² × ₺{m2p:,}/m²."
-                ),
-                "source": "web scraping (hepsiemlak/sahibinden)",
-                "price_list": scraped["prices"][:10],
-            }
-    except Exception as e:
-        print(f"[RAG] Property scraping error: {e}")
-
-    # 2. Claude web_search
+    # 1. Claude web_search ile gerçek zamanlı fiyat (primary)
     live = _live_search_property(city, district, square_meters)
     if live:
         return live
