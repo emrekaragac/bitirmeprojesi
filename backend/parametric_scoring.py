@@ -58,6 +58,14 @@ def compute_parametric_score(form_data: dict, questions: list) -> dict:
             except Exception:
                 score = 0.0
 
+        # Araç değeri bazlı özel skor — has_car=yes ise car value'ya göre ayarla
+        if q_id == "has_car" and answer_key == "yes":
+            car_val = _safe_float(form_data.get("estimated_car_value"))
+            if car_val is not None:
+                # "no" cevabının skoru maksimum kabul et
+                no_score = float(answer_scores.get("no", 100))
+                score = _car_value_score(car_val, no_score)
+
         weighted_points = (weight / 100.0) * score
         total += weighted_points
 
@@ -93,6 +101,38 @@ def compute_parametric_score(form_data: dict, questions: list) -> dict:
         "reasons": reasons,
         "breakdown": breakdown,
     }
+
+
+def _safe_float(val) -> float | None:
+    try:
+        if val is None or str(val).strip().lower() in ("", "none"):
+            return None
+        return float(str(val).replace(",", "."))
+    except Exception:
+        return None
+
+
+def _car_value_score(car_value: float, max_score: float) -> float:
+    """
+    Araç piyasa değerine göre 0–max_score arası puan döner.
+    2025-2026 Türkiye fiyat seviyeleri:
+      < 700K TL   → %80 (çok eski/ucuz araç)
+      700K–1.5M   → %50 (ekonomik segment)
+      1.5M–3M     → %25 (orta segment)
+      3M–7M       → %5  (üst segment)
+      > 7M        → 0   (lüks — puan yok)
+    """
+    if car_value < 700_000:
+        ratio = 0.80
+    elif car_value < 1_500_000:
+        ratio = 0.50
+    elif car_value < 3_000_000:
+        ratio = 0.25
+    elif car_value < 7_000_000:
+        ratio = 0.05
+    else:
+        ratio = 0.0
+    return round(max_score * ratio, 1)
 
 
 def _range_score(value: float, answer_scores: dict) -> float:
