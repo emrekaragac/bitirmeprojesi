@@ -34,8 +34,14 @@ ADMIN_KEY = os.getenv("ADMIN_KEY", "psds2024")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
-    init_scholarship_db()
+    try:
+        init_db()
+    except Exception as e:
+        print(f"[WARN] init_db failed: {e}")
+    try:
+        init_scholarship_db()
+    except Exception as e:
+        print(f"[WARN] init_scholarship_db failed: {e}")
     yield
 
 
@@ -99,6 +105,19 @@ def debug_system():
         result["web_search_tool"] = "✅ available"
     except Exception as e:
         result["web_search_tool"] = f"❌ {str(e)[:120]}"
+
+    # Veritabanı bağlantısı
+    try:
+        import psycopg2
+        db_url = os.getenv("DATABASE_URL", "")
+        if not db_url:
+            result["database"] = "❌ DATABASE_URL not set"
+        else:
+            conn = psycopg2.connect(db_url)
+            conn.close()
+            result["database"] = "✅ PostgreSQL bağlantısı OK"
+    except Exception as e:
+        result["database"] = f"❌ {str(e)[:120]}"
 
     return result
 
