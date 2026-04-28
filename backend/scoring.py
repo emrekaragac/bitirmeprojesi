@@ -81,21 +81,18 @@ def compute_scores(form_data: dict) -> dict:
         reasons.append("No vehicle ownership")
     else:
         if car_value is not None:
-            if car_value < 700_000:
-                car_score = 8
-                reasons.append(f"Very old/cheap vehicle (< 700K TL) — ₺{int(car_value):,}")
-            elif car_value < 1_500_000:
-                car_score = 5
-                reasons.append(f"Budget vehicle (700K–1.5M TL) — ₺{int(car_value):,}")
-            elif car_value < 3_000_000:
-                car_score = 2
-                reasons.append(f"Mid-range vehicle (1.5M–3M TL) — ₺{int(car_value):,}")
-            elif car_value < 7_000_000:
-                car_score = 0
-                reasons.append(f"Premium vehicle (3M–7M TL) — ₺{int(car_value):,}")
+            if car_value < 300_000:
+                car_score = 7
+                reasons.append("Old/low-value vehicle (< 300K TL)")
+            elif car_value < 800_000:
+                car_score = 4
+                reasons.append("Mid-value vehicle (300K-800K TL)")
+            elif car_value < 2_000_000:
+                car_score = 1
+                reasons.append("High-value vehicle (800K-2M TL)")
             else:
-                car_score = -5
-                reasons.append(f"Luxury vehicle (> 7M TL) — ₺{int(car_value):,} — lower priority")
+                car_score = -3
+                reasons.append("Luxury vehicle (> 2M TL) — lower priority")
         else:
             car_score = 3
 

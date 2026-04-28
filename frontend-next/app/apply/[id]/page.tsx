@@ -321,6 +321,40 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
         throw new Error(txt)
       }
       const data = await res.json()
+
+      // ── RAG debug logları (browser console) ────────────────────────────
+      // Sunucuda araç/konut değer tahmini nasıl yapıldı, hangi fiyatlar bulundu,
+      // outlier filtresi sonrası ne kaldı, web_search mi yoksa fallback formül mü.
+      try {
+        const dbg = data?._rag_debug
+        if (dbg) {
+          console.groupCollapsed("%c[RAG] Değerleme debug", "color:#4f46e5;font-weight:bold")
+          if (dbg.car) {
+            console.groupCollapsed("ARAÇ")
+            console.log("source:", dbg.car.source, "| confidence:", dbg.car.confidence)
+            console.log("estimate:", dbg.car.estimate, "TL")
+            console.log("raw_prices:", dbg.car.raw_prices)
+            console.log("filtered_prices (IQR):", dbg.car.filtered_prices)
+            console.log("reasoning:", dbg.car.reasoning)
+            console.log("trace:", dbg.car.trace)
+            if (dbg.car.error) console.error("error:", dbg.car.error)
+            console.groupEnd()
+          }
+          if (dbg.property) {
+            console.groupCollapsed("KONUT")
+            console.log("source:", dbg.property.source, "| confidence:", dbg.property.confidence)
+            console.log("estimate:", dbg.property.estimate, "TL  (m²:", dbg.property.m2_price, "TL)")
+            console.log("raw_prices:", dbg.property.raw_prices)
+            console.log("filtered_prices (IQR):", dbg.property.filtered_prices)
+            console.log("reasoning:", dbg.property.reasoning)
+            console.log("trace:", dbg.property.trace)
+            if (dbg.property.error) console.error("error:", dbg.property.error)
+            console.groupEnd()
+          }
+          console.groupEnd()
+        }
+      } catch {}
+
       setResult(data)
       setStep(3)
       try { localStorage.removeItem(DRAFT_KEY) } catch {}

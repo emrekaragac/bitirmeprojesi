@@ -128,39 +128,21 @@ def debug_system():
 @app.get("/debug-price")
 def debug_price(brand: str = "mercedes-benz", model: str = "S400d", year: int = 2022):
     """Araç fiyat tahmin pipeline'ını adım adım test eder."""
-    from backend.rag_valuation import (
-        _live_search_price, rag_estimate_car,
-        _run_web_search, _extract_prices,
-    )
-    import os, anthropic as _anthropic
+    from backend.rag_valuation import _live_search_price, rag_estimate_car
 
     result: dict = {"brand": brand, "model": model, "year": year}
 
-    # 1. Web search ham yanıt
+    # 1. Live search (trace dahil)
     try:
-        api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        client = _anthropic.Anthropic(api_key=api_key)
-        prompt = (
-            f"'{year} {brand} {model} ikinci el fiyat' diye Türkiye'de web araması yap. "
-            f"Arama sonuçlarında gördüğün TL fiyatlarını SADECE listele, "
-            f"yorum yapma, tahmin yapma. Her fiyat ayrı satırda."
-        )
-        raw_text = _run_web_search(client, "claude-haiku-4-5-20251001", prompt)
-        prices = _extract_prices(raw_text, 50_000, 100_000_000)
-        result["web_search_raw"] = raw_text[:600]
-        result["web_search_prices"] = prices
-    except Exception as e:
-        result["web_search_raw"] = f"hata: {e}"
-        result["web_search_prices"] = []
-
-    # 2. Live search sonucu
-    try:
-        live = _live_search_price(brand, model, year, has_damage=False)
-        result["live_search"] = live if live else "None döndü"
+        trace: list = []
+        live = _live_search_price(brand, model, year, has_damage=False, trace=trace)
+        result["live_search"] = live if live else "None döndü (yetersiz veri → fallback)"
+        result["trace"] = trace
     except Exception as e:
         result["live_search"] = f"hata: {e}"
+        result["trace"] = []
 
-    # 3. Nihai sonuç
+    # 2. Nihai sonuç (live başarısızsa fallback formül)
     try:
         final = rag_estimate_car(brand, model, year, has_damage=False)
         result["final_estimate"] = final
@@ -384,6 +366,7 @@ async def scholarship_apply(
     car_rag_used = False
     car_confidence = None
     car_reasoning = None
+    car_debug = None
 
     if has_car == "yes" and car_path:
         try:
@@ -415,10 +398,21 @@ async def scholarship_apply(
                     car_rag_used   = res_car.get("rag_used", False)
                     car_confidence = res_car.get("confidence")
                     car_reasoning  = res_car.get("reasoning")
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                    car_debug      = {
+                        "rag_used":   car_rag_used,
+                        "source":     res_car.get("source"),
+                        "confidence": car_confidence,
+                        "estimate":   estimated_car_value,
+                        "reasoning":  car_reasoning,
+                        "raw_prices":      res_car.get("raw_prices"),
+                        "filtered_prices": res_car.get("filtered_prices"),
+                        "price_count":     res_car.get("price_count"),
+                        "trace":           res_car.get("debug_trace"),
+                    }
+                except Exception as e:
+                    car_debug = {"error": f"rag_estimate_car raised: {str(e)[:200]}"}
+        except Exception as e:
+            car_debug = {"error": f"car block raised: {str(e)[:200]}"}
 
     # ── Tapu: belge oku → alan çıkar → değer tahmin ──────────────────────────
     tapu_data = None            # cross_check ve response'ta kullanılıyor
@@ -427,6 +421,7 @@ async def scholarship_apply(
     property_rag_used = False
     property_confidence = None
     property_reasoning = None
+    property_debug = None
 
     if has_house == "yes" and house_path:
         try:
@@ -456,10 +451,22 @@ async def scholarship_apply(
                     property_rag_used   = val.get("rag_used", False)
                     property_confidence = val.get("confidence")
                     property_reasoning  = val.get("reasoning")
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                    property_debug      = {
+                        "rag_used":   property_rag_used,
+                        "source":     val.get("source"),
+                        "confidence": property_confidence,
+                        "estimate":   property_estimated_value,
+                        "m2_price":   avg_m2_price,
+                        "reasoning":  property_reasoning,
+                        "raw_prices":      val.get("raw_prices"),
+                        "filtered_prices": val.get("filtered_prices"),
+                        "price_count":     val.get("price_count"),
+                        "trace":           val.get("debug_trace"),
+                    }
+                except Exception as e:
+                    property_debug = {"error": f"rag_estimate_property raised: {str(e)[:200]}"}
+        except Exception as e:
+            property_debug = {"error": f"property block raised: {str(e)[:200]}"}
 
     # Parse extra fields
     try:
@@ -570,6 +577,10 @@ async def scholarship_apply(
         "estimated_car_value": estimated_car_value,
         "ruhsat_ocr": ruhsat_data,
         "tapu_ocr": tapu_data,
+        "_rag_debug": {
+            "car":      car_debug,
+            "property": property_debug,
+        },
         "verification": {
             "tc_valid":       tc_validation.get("valid"),
             "tc_error":       tc_validation.get("error"),
