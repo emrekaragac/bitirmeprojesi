@@ -326,11 +326,20 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       // Sunucuda araç/konut değer tahmini nasıl yapıldı, hangi fiyatlar bulundu,
       // outlier filtresi sonrası ne kaldı, web_search mi yoksa fallback formül mü.
       try {
+        console.log("[apply] full backend response:", data)
         const dbg = data?._rag_debug
+        if (!dbg) {
+          console.warn("[RAG] _rag_debug alanı yok — backend eski kod çalıştırıyor olabilir")
+        }
         if (dbg) {
           console.groupCollapsed("%c[RAG] Değerleme debug", "color:#4f46e5;font-weight:bold")
+          const tierLabel = (t: number | undefined) =>
+            t === 1 ? "Tier 1: Gerçek ilanlar"
+            : t === 2 ? "Tier 2: Claude segment tahmini"
+            : "Tier 3: Marka/şehir formülü (fallback)"
           if (dbg.car) {
             console.groupCollapsed("ARAÇ")
+            console.log("tier:", tierLabel(dbg.car.trace?.find((s: { tier?: number }) => s?.tier)?.tier))
             console.log("source:", dbg.car.source, "| confidence:", dbg.car.confidence)
             console.log("estimate:", dbg.car.estimate, "TL")
             console.log("raw_prices:", dbg.car.raw_prices)
@@ -342,6 +351,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
           }
           if (dbg.property) {
             console.groupCollapsed("KONUT")
+            console.log("tier:", tierLabel(dbg.property.trace?.find((s: { tier?: number }) => s?.tier)?.tier))
             console.log("source:", dbg.property.source, "| confidence:", dbg.property.confidence)
             console.log("estimate:", dbg.property.estimate, "TL  (m²:", dbg.property.m2_price, "TL)")
             console.log("raw_prices:", dbg.property.raw_prices)

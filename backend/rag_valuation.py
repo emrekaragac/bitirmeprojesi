@@ -47,16 +47,19 @@ _CITY_M2: dict[str, int] = {
     "default": 20_000,
 }
 
-_CAR_DOMAINS = [
-    "sahibinden.com", "arabam.com", "letgo.com", "ikinciel.com",
-    "dod.com.tr", "otokocikincieli.com.tr", "borusanoto.com",
-    "otomobilcim.com", "gardiyan.com.tr",
-]
+# NOT: allowed_domains kısıtı KALDIRILDI çünkü sahibinden/arabam anti-bot
+# nedeniyle crawler snippet'inde fiyat dönmüyor. Open web'e bırakıldığında
+# Claude Google'ın aggregator snippet'lerinden fiyatları görebiliyor.
+# Yine de prompt içinde "tercih edilen kaynaklar" olarak listeleniyor.
+_CAR_PREFERRED_SITES = (
+    "sahibinden.com, arabam.com, letgo.com, dod.com.tr, "
+    "otokocikincieli.com.tr, borusanoto.com, otomobilcim.com"
+)
 
-_PROPERTY_DOMAINS = [
-    "sahibinden.com", "hepsiemlak.com", "emlakjet.com",
-    "zingat.com", "milliyetemlak.com", "endeksa.com",
-]
+_PROPERTY_PREFERRED_SITES = (
+    "sahibinden.com, hepsiemlak.com, emlakjet.com, "
+    "zingat.com, milliyetemlak.com, endeksa.com"
+)
 
 _PRICE_RE = [
     r'(\d{1,3}(?:\.\d{3})+)\s*(?:TL|₺)',
@@ -122,6 +125,11 @@ def _run_web_search(
         "type": "web_search_20250305",
         "name": "web_search",
         "max_uses": max_uses,
+        "user_location": {
+            "type": "approximate",
+            "country": "TR",
+            "timezone": "Europe/Istanbul",
+        },
     }
     if allowed_domains:
         tool["allowed_domains"] = allowed_domains
@@ -172,7 +180,7 @@ def _run_web_search(
             "queries": queries,
             "domains_hit": sorted(domains_hit),
             "raw_chars": len(full_text),
-            "raw_preview": full_text[:400],
+            "raw_preview": full_text[:1500],
         })
     return full_text
 
@@ -190,81 +198,144 @@ def _live_search_price(
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
 
+        damage_note = "ARAÇ HASAR KAYITLI — değer %18 düşük olmalı." if has_damage else "Hasar yok."
         prompt = (
-            f"Türkiye 2. el otomobil ilanlarını ara: \"{year} {brand} {model}\".\n"
-            f"SADECE arama snippet'lerinde DOĞRUDAN gördüğün TL fiyatları topla. "
-            f"Tahmin yapma, training data kullanma, hesaplama yapma — sadece SERP'te yazan rakamlar.\n"
-            f"Atla: yedek parça, kiralama, 0 km yeni model, hasar kayıtlı, ağır hasarlı.\n\n"
+            f"Türkiye 2. el otomobil pazarında \"{year} {brand} {model}\" fiyatını araştır.\n"
+            f"{damage_note}\n\n"
+            f"ÖNEMLİ ARAMA STRATEJİSİ:\n"
+            f"• En az 3 farklı arama yap. Farklı sorgular dene:\n"
+            f"  - \"{year} {brand} {model} fiyat türkiye\"\n"
+            f"  - \"{brand} {model} {year} ikinci el\"\n"
+            f"  - \"{brand} {model} sahibinden\" veya \"arabam.com\"\n"
+            f"• Tercih edilen kaynaklar: {_CAR_PREFERRED_SITES}\n"
+            f"• Ama AGGREGATOR snippet'leri de değerli: Google search snippet'lerinde "
+            f"fiyatlar görünüyorsa onları da topla (örn: bir satıcı sitesi snippet'inde "
+            f"\"650.000 TL\" yazıyorsa al).\n"
+            f"• Otomobil blogları, fiyat karşılaştırma siteleri, forum yorumlarında geçen "
+            f"piyasa fiyatları da kullanılabilir.\n\n"
+            f"İki şeyi birden topla:\n"
+            f"1) GERÇEK ilanlardaki/snippet'lerdeki TL fiyatları \"listings\" alanına koy. "
+            f"Yedek parça/kiralama/0 km/ağır hasarlı atla.\n"
+            f"2) Yeterli fiyat bulamasan bile, segment + yaş + hasar bilgine dayanarak "
+            f"makul bir aralık tahmin et (\"expert_low\", \"expert_high\", \"expert_estimate\"). "
+            f"Bu zorunlu.\n\n"
             f"Şu JSON formatında yanıt ver, başka metin yazma:\n"
-            f'{{"prices": [425000, 480000, 510000], "skipped": 2, "note": "kısa not"}}'
+            f"{{\n"
+            f"  \"listings\": [425000, 480000, 510000],\n"
+            f"  \"expert_low\": 400000,\n"
+            f"  \"expert_high\": 600000,\n"
+            f"  \"expert_estimate\": 480000,\n"
+            f"  \"segment\": \"B segment hatchback\",\n"
+            f"  \"note\": \"kısa Türkçe gerekçe — kaç ilan/snippet baktığını yaz\"\n"
+            f"}}"
         )
 
         full_text = _run_web_search(
             client, "claude-haiku-4-5-20251001", prompt,
-            allowed_domains=_CAR_DOMAINS, max_uses=5, trace=trace,
+            allowed_domains=None, max_uses=5, trace=trace,
         )
         log.info(f"car raw: {full_text[:200]}")
 
-        # Tercihen JSON parse et
-        prices: list[int] = []
-        data = _parse_json_block(full_text)
-        if data and isinstance(data.get("prices"), list):
-            for p in data["prices"]:
-                try:
-                    v = int(str(p).replace(".", "").replace(",", ""))
-                    if 50_000 <= v <= 100_000_000:
-                        prices.append(v)
-                except (ValueError, TypeError):
-                    pass
+        data = _parse_json_block(full_text) or {}
 
-        # JSON yoksa serbest metinden çek
-        if len(prices) < 3:
-            extra = _extract_prices(full_text, 50_000, 100_000_000)
-            for p in extra:
-                if p not in prices:
-                    prices.append(p)
+        def _to_int(v) -> int | None:
+            try:
+                n = int(str(v).replace(".", "").replace(",", ""))
+                return n if 50_000 <= n <= 100_000_000 else None
+            except (ValueError, TypeError):
+                return None
 
-        if len(prices) < 3:
-            log.warning(f"yetersiz fiyat (n={len(prices)}) — fallback'e düşülüyor")
+        listings: list[int] = []
+        for p in (data.get("listings") or []):
+            n = _to_int(p)
+            if n is not None:
+                listings.append(n)
+
+        # JSON yoksa serbest metinden çekmeyi de dene
+        if len(listings) < 3:
+            for p in _extract_prices(full_text, 50_000, 100_000_000):
+                if p not in listings:
+                    listings.append(p)
+
+        # ── Tier 1: gerçek listings yeterli mi? ───────────────────────────
+        if len(listings) >= 3:
+            cleaned = _remove_outliers_iqr(listings)
+            if len(cleaned) < 3:
+                cleaned = listings
+            median = statistics.median(cleaned)
+            if has_damage:
+                median = round(median * 0.82)
+            confidence = "high" if len(cleaned) >= 6 else "medium"
+            log.info(f"car tier1: n={len(cleaned)} median=₺{int(median):,} confidence={confidence}")
             if trace is not None:
                 trace.append({
                     "step": "aggregate_car",
-                    "result": "insufficient_data",
-                    "raw_prices": prices,
+                    "tier": 1,
+                    "raw_prices": listings,
+                    "after_iqr": cleaned,
+                    "median": int(median),
+                    "confidence": confidence,
                 })
-            return None
+            return {
+                "rag_used": True,
+                "tier": 1,
+                "estimated_car_value": int(median),
+                "confidence": confidence,
+                "price_count": len(cleaned),
+                "raw_prices": listings,
+                "filtered_prices": cleaned,
+                "reasoning": f"{year} {brand} {model} — {len(cleaned)} gerçek ilanın medyanı.",
+                "source": f"Claude web_search ({len(cleaned)} ilan)",
+            }
 
-        cleaned = _remove_outliers_iqr(prices)
-        if len(cleaned) < 3:
-            cleaned = prices  # IQR çok agresifse geri al
+        # ── Tier 2: Claude'un segment-bazlı tahmini ───────────────────────
+        expert = _to_int(data.get("expert_estimate"))
+        elow   = _to_int(data.get("expert_low"))
+        ehigh  = _to_int(data.get("expert_high"))
 
-        median = statistics.median(cleaned)
-        if has_damage:
-            median = round(median * 0.82)
+        if expert is not None and elow is not None and ehigh is not None and elow <= ehigh:
+            # has_damage zaten prompt'ta verildi, bu yüzden %82 indirimi tekrar uygulamıyoruz
+            log.info(f"car tier2: ₺{elow:,}–₺{ehigh:,} mid=₺{expert:,} (segment={data.get('segment')})")
+            if trace is not None:
+                trace.append({
+                    "step": "aggregate_car",
+                    "tier": 2,
+                    "result": "insufficient_listings_used_expert_estimate",
+                    "listings_found": listings,
+                    "expert_low": elow,
+                    "expert_high": ehigh,
+                    "expert_estimate": expert,
+                    "segment": data.get("segment"),
+                    "note": data.get("note"),
+                })
+            return {
+                "rag_used": True,
+                "tier": 2,
+                "estimated_car_value": expert,
+                "confidence": "medium",
+                "price_count": len(listings),
+                "raw_prices": listings,
+                "expert_range": [elow, ehigh],
+                "segment": data.get("segment"),
+                "reasoning": (
+                    f"{year} {brand} {model}: SERP'te yeterli ilan yok ({len(listings)}). "
+                    f"Segment-bazlı uzman tahmin: ₺{elow:,}–₺{ehigh:,}. "
+                    f"{data.get('note', '')}"
+                ),
+                "source": "Claude segment estimate",
+            }
 
-        confidence = "high" if len(cleaned) >= 6 else "medium" if len(cleaned) >= 3 else "low"
-        log.info(f"car: n={len(cleaned)} median=₺{int(median):,} confidence={confidence}")
-
+        # ── Hiçbir şey çıkmadı → fallback formüle bırak ────────────────────
+        log.warning(f"yetersiz tier1+tier2 (listings={len(listings)}, expert={expert})")
         if trace is not None:
             trace.append({
                 "step": "aggregate_car",
-                "raw_prices": prices,
-                "after_iqr": cleaned,
-                "median": int(median),
-                "has_damage_discount": has_damage,
-                "confidence": confidence,
+                "result": "insufficient_data",
+                "listings": listings,
+                "raw_data": data,
             })
+        return None
 
-        return {
-            "rag_used": True,
-            "estimated_car_value": int(median),
-            "confidence": confidence,
-            "price_count": len(cleaned),
-            "raw_prices": prices,
-            "filtered_prices": cleaned,
-            "reasoning": f"{year} {brand} {model} — {len(cleaned)} ilanın medyanı.",
-            "source": f"Claude web_search ({len(cleaned)} ilan)",
-        }
     except Exception as e:
         log.error(f"car live search hata: {e}")
         if trace is not None:
@@ -287,77 +358,132 @@ def _live_search_property(
 
         loc = f"{city} {district}".strip()
         prompt = (
-            f"Türkiye 2. el konut satılık ilanlarını ara: \"{loc}\" bölgesinde "
-            f"yaklaşık {square_meters:.0f} m² daire.\n"
-            f"SADECE arama snippet'lerinde DOĞRUDAN gördüğün TL fiyatları topla. "
-            f"Tahmin yapma, training data kullanma. Kiralık ilanları atla.\n\n"
+            f"Türkiye konut pazarında \"{loc}\" bölgesinde {square_meters:.0f} m² daire fiyatını araştır.\n\n"
+            f"ARAMA STRATEJİSİ:\n"
+            f"• En az 3 farklı arama yap. Farklı sorgular dene:\n"
+            f"  - \"{loc} satılık daire fiyat\"\n"
+            f"  - \"{city} {district} m² fiyat\"\n"
+            f"  - \"{loc} sahibinden\" veya \"hepsiemlak\"\n"
+            f"• Tercih edilen kaynaklar: {_PROPERTY_PREFERRED_SITES}\n"
+            f"• Aggregator/blog/haber snippet'lerinde fiyat görüyorsan onları da kullan.\n\n"
+            f"İki şeyi birden topla:\n"
+            f"1) GERÇEK satılık ilan fiyatlarını \"listings\" alanına koy. Kiralık atla.\n"
+            f"2) Yeterli ilan yoksa bile, lokasyon + m² + bölgesel piyasa bilgine dayanarak "
+            f"makul bir aralık tahmin et. Zorunlu.\n\n"
             f"Şu JSON formatında yanıt ver, başka metin yazma:\n"
-            f'{{"prices": [4500000, 5200000, 6100000], "note": "kısa not"}}'
+            f"{{\n"
+            f"  \"listings\": [4500000, 5200000, 6100000],\n"
+            f"  \"expert_low\": 4000000,\n"
+            f"  \"expert_high\": 7000000,\n"
+            f"  \"expert_estimate\": 5500000,\n"
+            f"  \"note\": \"kısa Türkçe gerekçe — kaç ilan/snippet baktığını yaz\"\n"
+            f"}}"
         )
 
         full_text = _run_web_search(
             client, "claude-haiku-4-5-20251001", prompt,
-            allowed_domains=_PROPERTY_DOMAINS, max_uses=5, trace=trace,
+            allowed_domains=None, max_uses=5, trace=trace,
         )
         log.info(f"property raw: {full_text[:200]}")
 
-        prices: list[int] = []
-        data = _parse_json_block(full_text)
-        if data and isinstance(data.get("prices"), list):
-            for p in data["prices"]:
-                try:
-                    v = int(str(p).replace(".", "").replace(",", ""))
-                    if 200_000 <= v <= 500_000_000:
-                        prices.append(v)
-                except (ValueError, TypeError):
-                    pass
+        data = _parse_json_block(full_text) or {}
 
-        if len(prices) < 3:
-            extra = _extract_prices(full_text, 200_000, 500_000_000)
-            for p in extra:
-                if p not in prices:
-                    prices.append(p)
+        def _to_int(v) -> int | None:
+            try:
+                n = int(str(v).replace(".", "").replace(",", ""))
+                return n if 200_000 <= n <= 500_000_000 else None
+            except (ValueError, TypeError):
+                return None
 
-        if len(prices) < 3:
-            log.warning(f"konut yetersiz fiyat (n={len(prices)}) — fallback")
+        listings: list[int] = []
+        for p in (data.get("listings") or []):
+            n = _to_int(p)
+            if n is not None:
+                listings.append(n)
+
+        if len(listings) < 3:
+            for p in _extract_prices(full_text, 200_000, 500_000_000):
+                if p not in listings:
+                    listings.append(p)
+
+        # ── Tier 1: gerçek ilan yeterli mi ────────────────────────────────
+        if len(listings) >= 3:
+            cleaned = _remove_outliers_iqr(listings)
+            if len(cleaned) < 3:
+                cleaned = listings
+            median = statistics.median(cleaned)
+            m2p = round(median / max(square_meters, 1))
+            confidence = "high" if len(cleaned) >= 6 else "medium"
+            log.info(f"prop tier1: n={len(cleaned)} median=₺{int(median):,} confidence={confidence}")
             if trace is not None:
                 trace.append({
                     "step": "aggregate_property",
-                    "result": "insufficient_data",
-                    "raw_prices": prices,
+                    "tier": 1,
+                    "raw_prices": listings,
+                    "after_iqr": cleaned,
+                    "median": int(median),
+                    "m2_price": m2p,
+                    "confidence": confidence,
                 })
-            return None
+            return {
+                "rag_used": True,
+                "tier": 1,
+                "property_estimated_value": int(median),
+                "avg_m2_price": m2p,
+                "confidence": confidence,
+                "price_count": len(cleaned),
+                "raw_prices": listings,
+                "filtered_prices": cleaned,
+                "reasoning": f"{loc} {square_meters:.0f}m² — {len(cleaned)} gerçek ilanın medyanı.",
+                "source": f"Claude web_search ({len(cleaned)} ilan)",
+            }
 
-        cleaned = _remove_outliers_iqr(prices)
-        if len(cleaned) < 3:
-            cleaned = prices
+        # ── Tier 2: segment-bazlı uzman tahmin ────────────────────────────
+        expert = _to_int(data.get("expert_estimate"))
+        elow   = _to_int(data.get("expert_low"))
+        ehigh  = _to_int(data.get("expert_high"))
 
-        median = statistics.median(cleaned)
-        m2p = round(median / max(square_meters, 1))
-        confidence = "high" if len(cleaned) >= 6 else "medium" if len(cleaned) >= 3 else "low"
-        log.info(f"property: n={len(cleaned)} median=₺{int(median):,} m2p=₺{m2p:,} confidence={confidence}")
+        if expert is not None and elow is not None and ehigh is not None and elow <= ehigh:
+            m2p = round(expert / max(square_meters, 1))
+            log.info(f"prop tier2: ₺{elow:,}–₺{ehigh:,} mid=₺{expert:,}")
+            if trace is not None:
+                trace.append({
+                    "step": "aggregate_property",
+                    "tier": 2,
+                    "result": "insufficient_listings_used_expert_estimate",
+                    "listings_found": listings,
+                    "expert_low": elow,
+                    "expert_high": ehigh,
+                    "expert_estimate": expert,
+                    "note": data.get("note"),
+                })
+            return {
+                "rag_used": True,
+                "tier": 2,
+                "property_estimated_value": expert,
+                "avg_m2_price": m2p,
+                "confidence": "medium",
+                "price_count": len(listings),
+                "raw_prices": listings,
+                "expert_range": [elow, ehigh],
+                "reasoning": (
+                    f"{loc} {square_meters:.0f}m²: SERP'te yeterli ilan yok ({len(listings)}). "
+                    f"Bölge-bazlı uzman tahmin: ₺{elow:,}–₺{ehigh:,}. "
+                    f"{data.get('note', '')}"
+                ),
+                "source": "Claude segment estimate",
+            }
 
+        log.warning(f"konut yetersiz tier1+tier2 (listings={len(listings)}, expert={expert})")
         if trace is not None:
             trace.append({
                 "step": "aggregate_property",
-                "raw_prices": prices,
-                "after_iqr": cleaned,
-                "median": int(median),
-                "m2_price": m2p,
-                "confidence": confidence,
+                "result": "insufficient_data",
+                "listings": listings,
+                "raw_data": data,
             })
+        return None
 
-        return {
-            "rag_used": True,
-            "property_estimated_value": int(median),
-            "avg_m2_price": m2p,
-            "confidence": confidence,
-            "price_count": len(cleaned),
-            "raw_prices": prices,
-            "filtered_prices": cleaned,
-            "reasoning": f"{loc} {square_meters:.0f}m² — {len(cleaned)} ilanın medyanı.",
-            "source": f"Claude web_search ({len(cleaned)} ilan)",
-        }
     except Exception as e:
         log.error(f"property live search hata: {e}")
         if trace is not None:
