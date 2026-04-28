@@ -8,10 +8,7 @@ Akış:
 """
 
 import os
-import re
-import json
 import datetime
-import statistics
 
 # ── Model-bazlı referans tablosu (sadece fallback) ────────────────────────────
 _MODEL_PRICES: dict[str, dict[int, int]] = {
@@ -165,107 +162,30 @@ def _remove_outliers(prices: list[int]) -> list[int]:
     return filtered if len(filtered) >= 3 else s
 
 
-def _parse_json(text: str) -> dict | None:
-    """İlk geçerli JSON objesini metinden çıkar (nested destekli)."""
-    start = text.find('{')
-    if start == -1:
-        return None
-    depth = 0
-    for i, ch in enumerate(text[start:], start):
-        if ch == '{':
-            depth += 1
-        elif ch == '}':
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(text[start:i + 1])
-                except Exception:
-                    return None
-    return None
-
-
-def _run_web_search(client, model: str, user_prompt: str, max_turns: int = 5) -> str:
-    """
-    web_search_20250305 tool ile çok turlu konuşma yürütür.
-    tool_use → tool_result döngüsünü yönetir, son metin yanıtını döner.
-    """
-    tools = [{"type": "web_search_20250305", "name": "web_search"}]
-    messages = [{"role": "user", "content": user_prompt}]
-    full_text = ""
-
-    for _ in range(max_turns):
-        resp = client.messages.create(
-            model=model,
-            max_tokens=1024,
-            tools=tools,
-            messages=messages,
-        )
-
-        for block in resp.content:
-            if hasattr(block, "text"):
-                full_text += block.text
-
-        if resp.stop_reason == "end_turn":
-            break
-
-        if resp.stop_reason == "tool_use":
-            tool_results = [
-                {"type": "tool_result", "tool_use_id": block.id, "content": ""}
-                for block in resp.content
-                if hasattr(block, "type") and block.type == "tool_use"
-            ]
-            messages.append({"role": "assistant", "content": resp.content})
-            if tool_results:
-                messages.append({"role": "user", "content": tool_results})
-            else:
-                break
-        else:
-            break
-
-    return full_text
 
 
 # ── Canlı web araması ile fiyat çekme ────────────────────────────────────────
 def _live_search_price(brand: str, model: str, year: int, has_damage: bool) -> dict | None:
     """
-    Claude web_search ile sahibinden/arabam.com arama sonucu snippet'lerini çeker.
-    Snippet metnindeki TL fiyatlarını regex ile ayıklar, IQR uygular, ortalar.
-    Siteye girme — sadece Google snippet metinlerindeki fiyatlar kullanılır.
+    Google/DuckDuckGo arama snippet HTML'inden TL fiyatlarını regex ile çeker.
+    IQR uygular, ortalar. Siteye girme — sadece snippet metni kullanılır.
     """
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        return None
     try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-
-        user_prompt = (
-            f"Sahibinden.com'da '{year} {brand} {model} ikinci el' ara. "
-            f"Arama sonuçlarında gördüğün ilan fiyatlarını (TL) aynen listele. "
-            f"Sadece fiyat rakamlarını yaz, yorum yapma, tahmin yapma. Örnek:\n"
-            f"12.249.900 TL\n11.500.000 TL\n13.750.000 TL"
-        )
-
-        full_text = _run_web_search(client, "claude-haiku-4-5-20251001", user_prompt)
-        print(f"[RAG] Web search raw response: {full_text[:500]}")
-
-        prices = _extract_prices(full_text, 100_000, 80_000_000)
-        print(f"[RAG] Extracted prices: {prices}")
-
-        if len(prices) < 2:
+        from backend.web_retrieval import fetch_car_prices
+        result = fetch_car_prices(brand, model, year)
+        if not result.get("found") or result["count"] < 2:
             return None
 
-        filtered = _remove_outliers(prices)
-        avg = int(statistics.mean(filtered))
+        avg = result["avg"]
         damage_factor = 0.82 if has_damage else 1.0
         val = round(avg * damage_factor)
 
         return {
             "rag_used": True,
             "estimated_car_value": val,
-            "confidence": "high" if len(filtered) >= 5 else "medium",
-            "reasoning": f"{len(filtered)} ilan ortalaması (IQR temizlendi): ₺{avg:,}",
-            "source": "sahibinden.com canlı arama",
+            "confidence": "high" if result["count"] >= 5 else "medium",
+            "reasoning": f"{result['count']} ilan ortalaması (IQR temizlendi): ₺{avg:,}",
+            "source": "sahibinden / arabam Google snippet",
         }
     except Exception as e:
         print(f"[RAG] Live search error: {e}")
@@ -273,37 +193,28 @@ def _live_search_price(brand: str, model: str, year: int, has_damage: bool) -> d
 
 
 def _live_search_property(city: str, district: str, square_meters: float) -> dict | None:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        return None
+    """
+    Google/DuckDuckGo arama snippet HTML'inden konut TL fiyatlarını regex ile çeker.
+    IQR uygular, m² fiyatına böler.
+    """
     try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
+        from backend.web_retrieval import fetch_property_prices
+        result = fetch_property_prices(city, district)
+        if not result.get("found") or result["count"] < 2:
+            return None
 
-        user_prompt = (
-            f"{city} / {district or 'merkez'} bölgesinde {square_meters} m² konutun güncel "
-            f"Türkiye satış fiyatını hepsiemlak.com veya sahibinden.com'dan ara. "
-            f"Benzer ilanlardan m² fiyatını ve toplam değeri bul. "
-            f"SADECE şu JSON formatında yanıt ver (başka hiçbir şey yazma): "
-            f'{{"estimated_value": <TL toplam tam sayı>, "price_per_m2": <TL/m² tam sayı>, '
-            f'"confidence": "low"/"medium"/"high", "reasoning": "<kaynağını 1 cümle Türkçe>"}}'
-        )
+        avg_total = result["avg_total"]
+        m2p = round(avg_total / max(square_meters, 1))
+        val = round(avg_total)
 
-        full_text = _run_web_search(client, "claude-haiku-4-5-20251001", user_prompt)
-
-        parsed = _parse_json(full_text)
-        if parsed and "estimated_value" in parsed:
-            val = int(parsed["estimated_value"])
-            m2p = int(parsed.get("price_per_m2", val / max(square_meters, 1)))
-            if 300_000 <= val <= 500_000_000:
-                return {
-                    "rag_used": True,
-                    "property_estimated_value": val,
-                    "avg_m2_price": m2p,
-                    "confidence": parsed.get("confidence", "medium"),
-                    "reasoning": parsed.get("reasoning", ""),
-                    "source": "hepsiemlak / sahibinden canlı arama",
-                }
+        return {
+            "rag_used": True,
+            "property_estimated_value": val,
+            "avg_m2_price": m2p,
+            "confidence": "high" if result["count"] >= 5 else "medium",
+            "reasoning": f"{result['count']} ilan ortalaması (IQR temizlendi): ₺{avg_total:,}",
+            "source": "sahibinden / hepsiemlak Google snippet",
+        }
     except Exception as e:
         print(f"[RAG] Live property search error: {e}")
     return None
