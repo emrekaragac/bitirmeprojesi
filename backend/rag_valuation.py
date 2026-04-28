@@ -8,7 +8,9 @@ Akış:
 """
 
 import os
+import re
 import datetime
+import statistics
 
 # ── Model-bazlı referans tablosu (sadece fallback) ────────────────────────────
 _MODEL_PRICES: dict[str, dict[int, int]] = {
@@ -164,28 +166,108 @@ def _remove_outliers(prices: list[int]) -> list[int]:
 
 
 
+_PRICE_RE = [
+    r'(\d{1,3}(?:\.\d{3})+)\s*(?:TL|₺)',
+    r'(?:TL|₺)\s*(\d{1,3}(?:\.\d{3})+)',
+    r'(\d{1,3}(?:,\d{3})+)\s*(?:TL|₺)',
+]
+
+
+def _extract_prices(text: str, min_val: int, max_val: int) -> list[int]:
+    found: set[int] = set()
+    for pat in _PRICE_RE:
+        for tok in re.findall(pat, text, re.IGNORECASE):
+            clean = tok.replace(".", "").replace(",", "")
+            try:
+                v = int(clean)
+                if min_val <= v <= max_val:
+                    found.add(v)
+            except ValueError:
+                pass
+    return sorted(found)
+
+
+def _remove_outliers(prices: list[int]) -> list[int]:
+    if len(prices) < 4:
+        return prices
+    s = sorted(prices)
+    n = len(s)
+    q1, q3 = s[n // 4], s[(3 * n) // 4]
+    iqr = q3 - q1
+    if iqr == 0:
+        return prices
+    lo, hi = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+    filtered = [p for p in s if lo <= p <= hi]
+    return filtered if len(filtered) >= 3 else s
+
+
+def _run_web_search(client, model: str, prompt: str, max_turns: int = 5) -> str:
+    tools = [{"type": "web_search_20250305", "name": "web_search"}]
+    messages = [{"role": "user", "content": prompt}]
+    full_text = ""
+    for _ in range(max_turns):
+        resp = client.messages.create(model=model, max_tokens=1024, tools=tools, messages=messages)
+        for block in resp.content:
+            if hasattr(block, "text"):
+                full_text += block.text
+        if resp.stop_reason == "end_turn":
+            break
+        if resp.stop_reason == "tool_use":
+            tool_results = [
+                {"type": "tool_result", "tool_use_id": b.id, "content": ""}
+                for b in resp.content if hasattr(b, "type") and b.type == "tool_use"
+            ]
+            messages.append({"role": "assistant", "content": resp.content})
+            if tool_results:
+                messages.append({"role": "user", "content": tool_results})
+            else:
+                break
+        else:
+            break
+    return full_text
+
+
 # ── Canlı web araması ile fiyat çekme ────────────────────────────────────────
 def _live_search_price(brand: str, model: str, year: int, has_damage: bool) -> dict | None:
     """
-    Google/DuckDuckGo arama snippet HTML'inden TL fiyatlarını regex ile çeker.
-    IQR uygular, ortalar. Siteye girme — sadece snippet metni kullanılır.
+    Claude web_search (Anthropic infra) ile sahibinden arama yapar.
+    Render IP'si değil Anthropic'in sunucuları arar — bloklanmaz.
+    Snippet metnindeki TL fiyatları regex ile çekilir, IQR + ortalama alınır.
     """
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return None
     try:
-        from backend.web_retrieval import fetch_car_prices
-        result = fetch_car_prices(brand, model, year)
-        if not result.get("found") or result["count"] < 2:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+
+        prompt = (
+            f"Sahibinden.com'da '{year} {brand} {model} ikinci el' ara. "
+            f"Arama sonuçlarında gördüğün ilan fiyatlarını (TL) SADECE listele, "
+            f"yorum yapma, tahmin yapma, açıklama yazma. Her fiyat ayrı satırda:\n"
+            f"12.249.900 TL\n11.500.000 TL\n13.750.000 TL"
+        )
+
+        full_text = _run_web_search(client, "claude-haiku-4-5-20251001", prompt)
+        print(f"[RAG] Claude web_search yanıtı: {full_text[:400]}")
+
+        prices = _extract_prices(full_text, 50_000, 100_000_000)
+        print(f"[RAG] Bulunan fiyatlar: {prices}")
+
+        if len(prices) < 2:
             return None
 
-        avg = result["avg"]
+        filtered = _remove_outliers(prices)
+        avg = int(statistics.mean(filtered))
         damage_factor = 0.82 if has_damage else 1.0
         val = round(avg * damage_factor)
 
         return {
             "rag_used": True,
             "estimated_car_value": val,
-            "confidence": "high" if result["count"] >= 5 else "medium",
-            "reasoning": f"{result['count']} ilan ortalaması (IQR temizlendi): ₺{avg:,}",
-            "source": "sahibinden / arabam Google snippet",
+            "confidence": "high" if len(filtered) >= 5 else "medium",
+            "reasoning": f"{len(filtered)} ilan ortalaması: ₺{avg:,}",
+            "source": "sahibinden.com (Claude web_search)",
         }
     except Exception as e:
         print(f"[RAG] Live search error: {e}")
@@ -194,26 +276,43 @@ def _live_search_price(brand: str, model: str, year: int, has_damage: bool) -> d
 
 def _live_search_property(city: str, district: str, square_meters: float) -> dict | None:
     """
-    Google/DuckDuckGo arama snippet HTML'inden konut TL fiyatlarını regex ile çeker.
-    IQR uygular, m² fiyatına böler.
+    Claude web_search ile sahibinden konut ilanı fiyatlarını çeker.
     """
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return None
     try:
-        from backend.web_retrieval import fetch_property_prices
-        result = fetch_property_prices(city, district)
-        if not result.get("found") or result["count"] < 2:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+
+        loc = f"{city} {district}".strip()
+        prompt = (
+            f"Sahibinden.com'da '{loc} satılık daire' ara. "
+            f"Arama sonuçlarında gördüğün ilan fiyatlarını (TL) SADECE listele, "
+            f"yorum yapma, tahmin yapma. Her fiyat ayrı satırda:\n"
+            f"4.500.000 TL\n3.800.000 TL\n5.200.000 TL"
+        )
+
+        full_text = _run_web_search(client, "claude-haiku-4-5-20251001", prompt)
+        print(f"[RAG] Konut web_search yanıtı: {full_text[:400]}")
+
+        prices = _extract_prices(full_text, 200_000, 500_000_000)
+        print(f"[RAG] Bulunan konut fiyatları: {prices}")
+
+        if len(prices) < 2:
             return None
 
-        avg_total = result["avg_total"]
-        m2p = round(avg_total / max(square_meters, 1))
-        val = round(avg_total)
+        filtered = _remove_outliers(prices)
+        avg = int(statistics.mean(filtered))
+        m2p = round(avg / max(square_meters, 1))
 
         return {
             "rag_used": True,
-            "property_estimated_value": val,
+            "property_estimated_value": avg,
             "avg_m2_price": m2p,
-            "confidence": "high" if result["count"] >= 5 else "medium",
-            "reasoning": f"{result['count']} ilan ortalaması (IQR temizlendi): ₺{avg_total:,}",
-            "source": "sahibinden / hepsiemlak Google snippet",
+            "confidence": "high" if len(filtered) >= 5 else "medium",
+            "reasoning": f"{len(filtered)} ilan ortalaması: ₺{avg:,}",
+            "source": "sahibinden.com (Claude web_search)",
         }
     except Exception as e:
         print(f"[RAG] Live property search error: {e}")
