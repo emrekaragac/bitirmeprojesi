@@ -61,11 +61,71 @@ const OPTION_LABELS: Record<string, string> = {
   own_device: "Own device", shared: "Shared device", school_only: "School only",
 }
 
+// ── Akıllı otomatik skor şablonları ─────────────────────────────────────────
+const SMART_SCORES: Record<string, Record<string, number>> = {
+  // Finansal sorular
+  monthly_income:    { under_22000: 100, "22000_40000": 75, "40000_75000": 45, "75000_150000": 15, over_150000: 0 },
+  has_car:           { yes: 0, no: 30 },
+  has_house:         { yes: 0, no: 40 },
+  is_renting:        { yes: 80, no: 0 },
+  parents_divorced:  { yes: 70, no: 0 },
+  father_working:    { yes: 0, no: 60 },
+  mother_working:    { yes: 0, no: 40 },
+  everyone_healthy:  { yes: 0, no: 70 },
+  other_scholarship: { yes: 0, no: 100 },
+  works_part_time:   { yes: 30, no: 0 },
+  has_debt:          { yes: 80, no: 0 },
+  siblings_in_uni:   { yes: 80, no: 0 },
+  family_retired:    { yes: 30, no: 0 },
+  family_supporting: { yes: 80, no: 0 },
+  sudden_income_loss:{ yes: 100, no: 0 },
+  has_disability:    { yes: 80, no: 0 },
+  family_needs_care: { yes: 80, no: 0 },
+  family_size:       { "1-2": 20, "3-4": 60, "5-6": 85, "7+": 100 },
+  siblings_count:    { "0": 10, "1": 40, "2": 65, "3+": 90 },
+  first_gen_grad:    { none_grad: 100, one_grad: 60, two_plus_grad: 20 },
+  highschool_location:{ village: 100, town: 60, big_city: 20 },
+  device_access:     { school_only: 100, shared: 60, own_device: 20 },
+  // Akademik sorular
+  gpa:               { "0-2": 10, "2-2.99": 40, "3-3.49": 70, "3.5-3.79": 90, "3.8-4": 100 },
+  gpa_system:        { "4": 50, "100": 50 },
+  has_research:      { yes: 100, no: 0 },
+  has_award:         { yes: 100, no: 0 },
+  language_level:    { none: 0, A1: 10, A2: 20, B1: 40, B2: 60, C1: 85, C2: 100 },
+  has_activity:      { yes: 60, no: 0 },
+  has_lang_cert:     { yes: 80, no: 0 },
+  has_intl_exp:      { yes: 80, no: 0 },
+  has_patent:        { yes: 100, no: 0 },
+  has_tubitak:       { yes: 90, no: 0 },
+  // Liderlik sorular
+  has_leadership_role: { yes: 90, no: 0 },
+  volunteer_hours:   { "0h": 0, "1_10h": 30, "11_50h": 70, "50h_plus": 100 },
+  has_social_project:{ yes: 90, no: 0 },
+  has_youth_platform:{ yes: 100, no: 0 },
+  has_startup:       { yes: 80, no: 0 },
+}
+
 function defaultScores(q: Omit<Question, "weight" | "answer_scores">): Record<string, number> {
-  if (q.type === "yesno") return { yes: 0, no: 0 }
-  if (q.type === "select" && q.options) return Object.fromEntries(q.options.map(o => [o, 0]))
-  if (q.type === "number") return { "0-2": 0, "3-4": 0, "5+": 0 }
+  if (SMART_SCORES[q.id]) return { ...SMART_SCORES[q.id] }
+  if (q.type === "yesno") return { yes: 50, no: 0 }
+  if (q.type === "select" && q.options) {
+    const n = q.options.length
+    return Object.fromEntries(q.options.map((o, i) => [o, Math.round(100 - (100 / (n - 1 || 1)) * i)]))
+  }
+  if (q.type === "number") return { "0-2": 20, "3-4": 60, "5+": 100 }
   return {}
+}
+
+function autoAssignWeights(questions: Question[]): Question[] {
+  const n = questions.length
+  if (n === 0) return questions
+  const base = Math.floor(100 / n)
+  const remainder = 100 - base * n
+  return questions.map((q, i) => ({
+    ...q,
+    weight: base + (i < remainder ? 1 : 0),
+    answer_scores: defaultScores(q),
+  }))
 }
 
 // ── Soru Havuzu ──────────────────────────────────────────────
@@ -506,7 +566,10 @@ export default function SetupPage() {
 
             <div className="flex gap-3">
               <button onClick={() => setStep(0)} className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm">← Back</button>
-              <button onClick={() => setQPhase(1)} disabled={config.questions.length === 0}
+              <button onClick={() => {
+                setConfig(prev => ({ ...prev, questions: autoAssignWeights(prev.questions) }))
+                setQPhase(1)
+              }} disabled={config.questions.length === 0}
                 className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 text-sm disabled:opacity-50">
                 Set Weights & Scores → ({config.questions.length} selected)
               </button>
@@ -519,7 +582,19 @@ export default function SetupPage() {
           <div className="space-y-5">
             <div>
               <h2 className="text-xl font-black text-slate-800 mb-1">Weights & Answer Scores</h2>
-              <p className="text-slate-500 text-sm">Set each question's weight and score per answer</p>
+              <p className="text-slate-500 text-sm">Ağırlıklar ve puanlar otomatik atandı. İstersen değiştirebilirsin.</p>
+            </div>
+
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-indigo-800">✨ Otomatik skor atandı</p>
+                <p className="text-xs text-indigo-600 mt-0.5">Ağırlıklar eşit dağıtıldı, cevap puanları soru tipine göre ayarlandı.</p>
+              </div>
+              <button
+                onClick={() => setConfig(prev => ({ ...prev, questions: autoAssignWeights(prev.questions) }))}
+                className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-700 transition whitespace-nowrap ml-3">
+                Sıfırla
+              </button>
             </div>
 
             <div className={`rounded-2xl p-4 border-2 ${weightOk ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
