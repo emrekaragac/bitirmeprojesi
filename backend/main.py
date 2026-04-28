@@ -633,7 +633,6 @@ async def analyze(
     ruhsat_data = None
     tapu_data   = None
 
-    vision_car_result = None
     if car_file and car_file.filename:
         car_path = f"uploads/{car_file.filename}"
         with open(car_path, "wb") as buf:
@@ -655,14 +654,10 @@ async def analyze(
                     if not car_model and vr.get("model"): car_model = vr["model"]
                     if not car_year  and vr.get("yil"):   car_year  = str(vr["yil"])
                     if vr.get("hasar"):                    car_damage = "yes"
-                    if vr.get("estimated_value_tl"):
-                        vision_car_result = {"estimated_value": vr["estimated_value_tl"],
-                                             "confidence": vr.get("confidence", "medium"),
-                                             "reasoning": vr.get("reasoning", "")}
+                    # Vision'dan fiyat tahmini kullanılmıyor — her zaman rag_estimate_car çağrılır
         except Exception:
             pass
 
-    vision_house_result = None
     if house_file and house_file.filename:
         house_path = f"uploads/{house_file.filename}"
         with open(house_path, "wb") as buf:
@@ -680,11 +675,7 @@ async def analyze(
                 if vh:
                     if not city          and vh.get("il"):        city          = vh["il"]
                     if not square_meters and vh.get("yuzolcumu"): square_meters = str(vh["yuzolcumu"])
-                    if vh.get("estimated_value_tl"):
-                        vision_house_result = {"estimated_value": vh["estimated_value_tl"],
-                                               "price_per_m2": vh.get("price_per_m2"),
-                                               "confidence": vh.get("confidence", "medium"),
-                                               "reasoning": vh.get("reasoning", "")}
+                    # Vision'dan fiyat tahmini kullanılmıyor — her zaman rag_estimate_property çağrılır
         except Exception:
             pass
 
@@ -694,12 +685,7 @@ async def analyze(
     car_reasoning = None
     if has_car == "yes":
         try:
-            if vision_car_result and vision_car_result.get("estimated_value"):
-                estimated_car_value = vision_car_result["estimated_value"]
-                car_rag_used = True
-                car_confidence = vision_car_result.get("confidence", "medium")
-                car_reasoning = vision_car_result.get("reasoning", "")
-            elif car_brand and car_year:
+            if car_brand and car_year:
                 car_ocr_text = ruhsat_data.get("raw_text", "") if ruhsat_data else ""
                 res = rag_estimate_car(
                     brand=car_brand, model=car_model,
@@ -720,13 +706,7 @@ async def analyze(
     property_reasoning = None
     if has_house == "yes":
         try:
-            if vision_house_result and vision_house_result.get("estimated_value"):
-                property_estimated_value = vision_house_result["estimated_value"]
-                avg_m2_price = vision_house_result.get("price_per_m2")
-                property_rag_used = True
-                property_confidence = vision_house_result.get("confidence", "medium")
-                property_reasoning = vision_house_result.get("reasoning", "")
-            elif city and square_meters:
+            if city and square_meters:
                 house_ocr_text = tapu_data.get("raw_text", "") if tapu_data else ""
                 val = rag_estimate_property(
                     city=city, district=district,
