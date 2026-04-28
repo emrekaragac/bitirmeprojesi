@@ -379,7 +379,7 @@ async def scholarship_apply(
                 if not car_year  and ruhsat_data.get("yil"):    car_year  = str(ruhsat_data["yil"])
             ocr_text = ruhsat_data.get("raw_text", "") if ruhsat_data else ""
 
-            # Vision: marka veya yıl yoksa çağır (kullanıcı zaten girdiyse atla)
+            # Vision: marka/model/yıl/hasar çıkar — fiyat tahmini Vision'dan alınmaz
             if not (car_brand and car_year):
                 vr = analyze_car(car_path)
                 if vr:
@@ -387,13 +387,8 @@ async def scholarship_apply(
                     if not car_model and vr.get("model"):  car_model = vr["model"]
                     if not car_year  and vr.get("yil"):    car_year  = str(vr["yil"])
                     if vr.get("hasar"):                     car_damage = "yes"
-                    if vr.get("estimated_value_tl"):
-                        estimated_car_value = vr["estimated_value_tl"]
-                        car_rag_used   = True
-                        car_confidence = vr.get("confidence", "medium")
-                        car_reasoning  = vr.get("reasoning", "")
 
-            if not estimated_car_value and car_brand and car_year:
+            if car_brand and car_year:
                 try:
                     res_car = rag_estimate_car(
                         brand=car_brand, model=car_model,
@@ -426,19 +421,14 @@ async def scholarship_apply(
                 if not square_meters and tapu_data.get("yuzolcumu"): square_meters = str(tapu_data["yuzolcumu"])
             ocr_text = tapu_data.get("raw_text", "") if tapu_data else ""
 
+            # Vision: il/ilçe/m² çıkar — fiyat tahmini Vision'dan alınmaz
             if not (city and square_meters):
                 vh = analyze_house(house_path)
                 if vh:
                     if not city          and vh.get("il"):        city          = vh["il"]
                     if not square_meters and vh.get("yuzolcumu"): square_meters = str(vh["yuzolcumu"])
-                    if vh.get("estimated_value_tl"):
-                        property_estimated_value = vh["estimated_value_tl"]
-                        avg_m2_price        = vh.get("price_per_m2")
-                        property_rag_used   = True
-                        property_confidence = vh.get("confidence", "medium")
-                        property_reasoning  = vh.get("reasoning", "")
 
-            if not property_estimated_value and city and square_meters:
+            if city and square_meters:
                 try:
                     val = rag_estimate_property(
                         city=city, district=district,
