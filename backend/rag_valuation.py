@@ -267,29 +267,46 @@ def rag_estimate_car(
     brand: str, model: str, year: int,
     has_damage: bool = False, ocr_text: str = "",
 ) -> dict:
+    damage_factor = 0.82 if has_damage else 1.0
+
+    # Model tablosunu her zaman hesapla — sanity check için referans
+    ref_price = _lookup_model_price(brand, model, year)
+    ref_val = round(ref_price * damage_factor) if ref_price else None
+    print(f"[RAG] Model table lookup: brand={brand}, model={model}, year={year} → {ref_val}")
+
     # 1. Claude web_search ile gerçek zamanlı fiyat (primary)
     live = _live_search_price(brand, model, year, has_damage)
     if live:
+        live_val = live["estimated_car_value"]
+        print(f"[RAG] Live search returned: {live_val:,}")
+        # Sanity check: eğer model tablosu çok daha yüksek bir değer veriyorsa
+        # (web_search eski/yanlış veri döndürmüş olabilir), model tablosunu kullan
+        if ref_val and live_val < ref_val * 0.6:
+            print(f"[RAG] Live search {live_val:,} < 60% of table {ref_val:,} → model tablosu kullanılıyor")
+            return {
+                "rag_used": True,
+                "estimated_car_value": ref_val,
+                "confidence": "medium",
+                "reasoning": f"{brand} {model} {year} için referans tablo fiyatı (canlı arama tutarsız geldi).",
+                "source": "model fiyat tablosu",
+            }
         return live
 
-    # 3. Model fiyat tablosu
-    ref_price = _lookup_model_price(brand, model, year)
-    if ref_price:
-        damage_factor = 0.82 if has_damage else 1.0
-        val = round(ref_price * damage_factor)
+    # 2. Model fiyat tablosu
+    if ref_val:
         return {
             "rag_used": True,
-            "estimated_car_value": val,
+            "estimated_car_value": ref_val,
             "confidence": "medium",
             "reasoning": f"{brand} {model} {year} için referans tablo fiyatı.",
             "source": "model fiyat tablosu",
         }
 
-    # 4. Marka bazlı formül
+    # 3. Marka bazlı formül
     age = max(0, datetime.datetime.now().year - int(year))
     base = _BRAND_BASE.get(brand.lower(), _BRAND_BASE["default"])
     dep = max(0.25, (1 - 0.10) ** age)
-    val = round(base * dep * (0.82 if has_damage else 1.0))
+    val = round(base * dep * damage_factor)
     return {
         "rag_used": False,
         "estimated_car_value": val,

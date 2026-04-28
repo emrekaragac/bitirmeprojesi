@@ -122,6 +122,39 @@ def debug_system():
     return result
 
 # ─────────────────────────────────────────────────────────────
+# DEBUG — araç fiyat pipeline testi
+# ─────────────────────────────────────────────────────────────
+
+@app.get("/debug-price")
+def debug_price(brand: str = "mercedes-benz", model: str = "S400d", year: int = 2022):
+    """Araç fiyat tahmin pipeline'ını adım adım test eder."""
+    from backend.rag_valuation import (
+        _lookup_model_price, _live_search_price, rag_estimate_car
+    )
+    result: dict = {"brand": brand, "model": model, "year": year}
+
+    # 1. Model tablosu
+    ref = _lookup_model_price(brand, model, year)
+    result["model_table_price"] = f"₺{ref:,}" if ref else "bulunamadı"
+
+    # 2. Web search (ayrı çalıştır)
+    try:
+        live = _live_search_price(brand, model, year, has_damage=False)
+        result["live_search"] = live if live else "None döndü"
+    except Exception as e:
+        result["live_search"] = f"hata: {e}"
+
+    # 3. Nihai sonuç
+    try:
+        final = rag_estimate_car(brand, model, year, has_damage=False)
+        result["final_estimate"] = final
+    except Exception as e:
+        result["final_estimate"] = f"hata: {e}"
+
+    return result
+
+
+# ─────────────────────────────────────────────────────────────
 # DEBUG — belge metin çıkarma testi
 # ─────────────────────────────────────────────────────────────
 
