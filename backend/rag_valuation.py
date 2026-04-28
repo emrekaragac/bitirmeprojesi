@@ -11,6 +11,7 @@ import os
 import re
 import json
 import datetime
+import statistics
 
 # ── Model-bazlı referans tablosu (sadece fallback) ────────────────────────────
 _MODEL_PRICES: dict[str, dict[int, int]] = {
@@ -129,6 +130,41 @@ def _lookup_model_price(brand: str, model: str, year: int) -> int | None:
     return None
 
 
+_PRICE_RE = [
+    r'(\d{1,3}(?:\.\d{3})+)\s*(?:TL|₺)',      # 12.249.900 TL
+    r'(?:TL|₺)\s*(\d{1,3}(?:\.\d{3})+)',      # ₺ 12.249.900
+    r'(\d{1,3}(?:,\d{3})+)\s*(?:TL|₺)',       # 12,249,900 TL
+]
+
+
+def _extract_prices(text: str, min_val: int, max_val: int) -> list[int]:
+    found: set[int] = set()
+    for pat in _PRICE_RE:
+        for tok in re.findall(pat, text, re.IGNORECASE):
+            clean = tok.replace(".", "").replace(",", "")
+            try:
+                v = int(clean)
+                if min_val <= v <= max_val:
+                    found.add(v)
+            except ValueError:
+                pass
+    return sorted(found)
+
+
+def _remove_outliers(prices: list[int]) -> list[int]:
+    if len(prices) < 4:
+        return prices
+    s = sorted(prices)
+    n = len(s)
+    q1, q3 = s[n // 4], s[(3 * n) // 4]
+    iqr = q3 - q1
+    if iqr == 0:
+        return prices
+    lo, hi = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+    filtered = [p for p in s if lo <= p <= hi]
+    return filtered if len(filtered) >= 3 else s
+
+
 def _parse_json(text: str) -> dict | None:
     """İlk geçerli JSON objesini metinden çıkar (nested destekli)."""
     start = text.find('{')
@@ -191,6 +227,11 @@ def _run_web_search(client, model: str, user_prompt: str, max_turns: int = 5) ->
 
 # ── Canlı web araması ile fiyat çekme ────────────────────────────────────────
 def _live_search_price(brand: str, model: str, year: int, has_damage: bool) -> dict | None:
+    """
+    Claude web_search ile sahibinden/arabam.com arama sonucu snippet'lerini çeker.
+    Snippet metnindeki TL fiyatlarını regex ile ayıklar, IQR uygular, ortalar.
+    Siteye girme — sadece Google snippet metinlerindeki fiyatlar kullanılır.
+    """
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         return None
@@ -199,27 +240,33 @@ def _live_search_price(brand: str, model: str, year: int, has_damage: bool) -> d
         client = anthropic.Anthropic(api_key=api_key)
 
         user_prompt = (
-            f"{year} model {brand} {model} aracının güncel Türkiye ikinci el piyasa fiyatını "
-            f"arabam.com veya sahibinden.com'dan ara. "
-            f"{'Hasar kaydı var.' if has_damage else 'Hasar kaydı yok.'} "
-            f"Bulduğun fiyatlara göre SADECE şu JSON formatında yanıt ver (başka hiçbir şey yazma): "
-            f'{{"estimated_value": <TL tam sayı>, "confidence": "low"/"medium"/"high", '
-            f'"reasoning": "<kaynağını 1 cümle Türkçe>"}}'
+            f"Sahibinden.com'da '{year} {brand} {model} ikinci el' ara. "
+            f"Arama sonuçlarında gördüğün ilan fiyatlarını (TL) aynen listele. "
+            f"Sadece fiyat rakamlarını yaz, yorum yapma, tahmin yapma. Örnek:\n"
+            f"12.249.900 TL\n11.500.000 TL\n13.750.000 TL"
         )
 
         full_text = _run_web_search(client, "claude-haiku-4-5-20251001", user_prompt)
+        print(f"[RAG] Web search raw response: {full_text[:500]}")
 
-        parsed = _parse_json(full_text)
-        if parsed and "estimated_value" in parsed:
-            val = int(parsed["estimated_value"])
-            if 100_000 <= val <= 50_000_000:
-                return {
-                    "rag_used": True,
-                    "estimated_car_value": val,
-                    "confidence": parsed.get("confidence", "medium"),
-                    "reasoning": parsed.get("reasoning", ""),
-                    "source": "arabam.com / sahibinden.com canlı arama",
-                }
+        prices = _extract_prices(full_text, 100_000, 80_000_000)
+        print(f"[RAG] Extracted prices: {prices}")
+
+        if len(prices) < 2:
+            return None
+
+        filtered = _remove_outliers(prices)
+        avg = int(statistics.mean(filtered))
+        damage_factor = 0.82 if has_damage else 1.0
+        val = round(avg * damage_factor)
+
+        return {
+            "rag_used": True,
+            "estimated_car_value": val,
+            "confidence": "high" if len(filtered) >= 5 else "medium",
+            "reasoning": f"{len(filtered)} ilan ortalaması (IQR temizlendi): ₺{avg:,}",
+            "source": "sahibinden.com canlı arama",
+        }
     except Exception as e:
         print(f"[RAG] Live search error: {e}")
     return None
@@ -269,40 +316,24 @@ def rag_estimate_car(
 ) -> dict:
     damage_factor = 0.82 if has_damage else 1.0
 
-    # Model tablosunu her zaman hesapla — sanity check için referans
-    ref_price = _lookup_model_price(brand, model, year)
-    ref_val = round(ref_price * damage_factor) if ref_price else None
-    print(f"[RAG] Model table lookup: brand={brand}, model={model}, year={year} → {ref_val}")
-
-    # 1. Claude web_search ile gerçek zamanlı fiyat (primary)
+    # 1. Sahibinden snippet'lerinden canlı fiyat
     live = _live_search_price(brand, model, year, has_damage)
     if live:
-        live_val = live["estimated_car_value"]
-        print(f"[RAG] Live search returned: {live_val:,}")
-        # Sanity check: eğer model tablosu çok daha yüksek bir değer veriyorsa
-        # (web_search eski/yanlış veri döndürmüş olabilir), model tablosunu kullan
-        if ref_val and live_val < ref_val * 0.6:
-            print(f"[RAG] Live search {live_val:,} < 60% of table {ref_val:,} → model tablosu kullanılıyor")
-            return {
-                "rag_used": True,
-                "estimated_car_value": ref_val,
-                "confidence": "medium",
-                "reasoning": f"{brand} {model} {year} için referans tablo fiyatı (canlı arama tutarsız geldi).",
-                "source": "model fiyat tablosu",
-            }
         return live
 
-    # 2. Model fiyat tablosu
-    if ref_val:
+    # 2. Model fiyat tablosu (fallback)
+    ref_price = _lookup_model_price(brand, model, year)
+    if ref_price:
+        val = round(ref_price * damage_factor)
         return {
             "rag_used": True,
-            "estimated_car_value": ref_val,
+            "estimated_car_value": val,
             "confidence": "medium",
-            "reasoning": f"{brand} {model} {year} için referans tablo fiyatı.",
+            "reasoning": f"{brand} {model} {year} referans tablo fiyatı.",
             "source": "model fiyat tablosu",
         }
 
-    # 3. Marka bazlı formül
+    # 3. Marka bazlı formül (son çare)
     age = max(0, datetime.datetime.now().year - int(year))
     base = _BRAND_BASE.get(brand.lower(), _BRAND_BASE["default"])
     dep = max(0.25, (1 - 0.10) ** age)
@@ -311,7 +342,7 @@ def rag_estimate_car(
         "rag_used": False,
         "estimated_car_value": val,
         "confidence": "low",
-        "reasoning": f"{brand} marka bazlı formül ({age} yıl amortismanı).",
+        "reasoning": f"{brand} marka bazlı formül ({age} yıl).",
         "source": "marka bazlı formül",
     }
 
