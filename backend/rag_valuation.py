@@ -10,12 +10,33 @@ Akış:
 Tüm adımlar trace listesine yazılır.
 """
 
+from __future__ import annotations
+
 import os
 import re
 import json
 import logging
 import datetime
 import statistics
+import time
+
+# ── Basit in-memory cache (process ömrü boyunca, ~30 dk TTL) ─────────────────
+_CACHE: dict[str, tuple[dict, float]] = {}
+_CACHE_TTL = 1800  # 30 dakika
+
+
+def _cache_get(key: str) -> dict | None:
+    if key in _CACHE:
+        result, ts = _CACHE[key]
+        if time.time() - ts < _CACHE_TTL:
+            log.info(f"Cache hit: {key}")
+            return result
+        del _CACHE[key]
+    return None
+
+
+def _cache_set(key: str, value: dict) -> None:
+    _CACHE[key] = (value, time.time())
 
 log = logging.getLogger("psds.rag")
 if not log.handlers:
@@ -69,6 +90,15 @@ _PRICE_RE = [
     r'(\d{6,9})\s*(?:TL|₺)',
 ]
 
+# m² birim fiyatı pattern'leri — toplam fiyat yerine m²/TL çekmek için
+_M2_PRICE_RE = [
+    r'(\d{1,3}(?:\.\d{3})+)\s*(?:TL|₺)\s*/\s*m[²2]',
+    r'(\d{1,3}(?:\.\d{3})+)\s*(?:TL|₺)\s*(?:per|başına)\s*m[²2]',
+    r'm[²2]\s*(?:fiyat[ıi]?|birim\s*fiyat[ıi]?)[ıi]?\s*:?\s*(\d{1,3}(?:\.\d{3})+)',
+    r'ortalama\s+m[²2]\s+fiyat[ıi]?\s*:?\s*(\d{1,3}(?:\.\d{3})+)',
+    r'(\d{2,3}(?:\.\d{3})?)\s*(?:TL|₺)\s*/\s*m[²2]',
+]
+
 
 # ── Yardımcılar ───────────────────────────────────────────────────────────────
 def _extract_prices(text: str, min_val: int, max_val: int) -> list[int]:
@@ -79,6 +109,25 @@ def _extract_prices(text: str, min_val: int, max_val: int) -> list[int]:
             try:
                 v = int(clean)
                 if min_val <= v <= max_val:
+                    found.add(v)
+            except ValueError:
+                pass
+    return sorted(found)
+
+
+def _extract_m2_unit_prices(text: str, min_m2: int = 8_000, max_m2: int = 400_000) -> list[int]:
+    """
+    Metin içinden m² birim fiyatlarını çeker.
+    Örn: "45.000 TL/m²" → 45000
+    min_m2/max_m2: Türkiye 2025 makul m² aralığı.
+    """
+    found: set[int] = set()
+    for pat in _M2_PRICE_RE:
+        for tok in re.findall(pat, text, re.IGNORECASE):
+            clean = tok.replace(".", "").replace(",", "")
+            try:
+                v = int(clean)
+                if min_m2 <= v <= max_m2:
                     found.add(v)
             except ValueError:
                 pass
@@ -446,32 +495,87 @@ def _live_search_property(
 
     loc = f"{city} {district}".strip()
 
-    # ── ADIM 1: Serper.dev ile canlı Google snippet fiyatları ─────────────────
-    serper_queries = [
-        f"{loc} satılık daire fiyat",
-        f"{loc} {square_meters:.0f} m2 satılık daire TL",
-        f"{city} {district} satılık konut sahibinden hepsiemlak",
-    ]
-    serper_prices = _serper_prices(serper_queries, _PROP_MIN, _PROP_MAX, trace)
-    if len(serper_prices) >= 3:
-        cleaned = _remove_outliers_iqr(serper_prices)
-        if len(cleaned) < 2:
-            cleaned = serper_prices
-        median = int(statistics.median(cleaned))
-        m2p = round(median / max(square_meters, 1))
-        log.info(f"Serper konut tier1: n={len(cleaned)} median=₺{median:,}")
-        if trace is not None:
-            trace.append({"step": "aggregate_property", "source": "serper", "tier": 1,
-                          "raw": serper_prices, "cleaned": cleaned, "median": median})
-        return {
-            "rag_used": True, "tier": 1,
-            "property_estimated_value": median,
-            "avg_m2_price": m2p,
-            "confidence": "high" if len(cleaned) >= 5 else "medium",
-            "price_count": len(cleaned),
-            "reasoning": f"{loc} {square_meters}m² — Serper/Google'dan {len(cleaned)} ilan medyanı.",
-            "source": "Serper.dev (Google)",
-        }
+    # ── ADIM 1: Serper.dev — önce m² birim fiyatı ara (daha doğru) ───────────
+    serper_api_key = os.getenv("SERPER_API_KEY")
+    if serper_api_key:
+        # 1a. m²/birim fiyatı sorgula
+        m2_unit_queries = [
+            f"{loc} daire m2 satış fiyatı 2025",
+            f"{city} {district} konut ortalama m2 fiyat",
+            f"endeksa {loc} m2 fiyatı",
+            f"hepsiemlak {loc} m2 fiyat 2025",
+        ]
+        all_m2_texts = ""
+        for q in m2_unit_queries:
+            t = _serper_search(q)
+            if not t:
+                break
+            all_m2_texts += "\n" + t
+            unit_prices_so_far = _extract_m2_unit_prices(all_m2_texts)
+            log.info(f"Serper m² '{q[:50]}' → birim fiyatlar: {unit_prices_so_far[:5]}")
+            if trace is not None:
+                trace.append({"step": "serper_m2", "query": q,
+                               "unit_prices": unit_prices_so_far})
+            if len(unit_prices_so_far) >= 3:
+                break
+
+        m2_unit_prices = _extract_m2_unit_prices(all_m2_texts)
+        if len(m2_unit_prices) >= 2:
+            cleaned_m2 = _remove_outliers_iqr(m2_unit_prices)
+            if len(cleaned_m2) < 2:
+                cleaned_m2 = m2_unit_prices
+            median_m2 = int(statistics.median(cleaned_m2))
+            total = round(median_m2 * square_meters)
+            if _PROP_MIN <= total <= _PROP_MAX:
+                log.info(f"Serper m²-birim tier1: m2p=₺{median_m2:,} × {square_meters}m² = ₺{total:,}")
+                if trace is not None:
+                    trace.append({
+                        "step": "aggregate_property", "source": "serper_m2_unit",
+                        "tier": 1, "unit_prices": m2_unit_prices,
+                        "cleaned_unit_prices": cleaned_m2,
+                        "median_m2_price": median_m2,
+                        "square_meters": square_meters,
+                        "total": total,
+                    })
+                return {
+                    "rag_used": True, "tier": 1,
+                    "property_estimated_value": total,
+                    "avg_m2_price": median_m2,
+                    "confidence": "high" if len(cleaned_m2) >= 4 else "medium",
+                    "price_count": len(cleaned_m2),
+                    "reasoning": (
+                        f"{loc}: ₺{median_m2:,}/m² × {square_meters:.0f}m² = ₺{total:,} "
+                        f"({len(cleaned_m2)} Serper m² verisi)."
+                    ),
+                    "source": "Serper.dev — m² birim fiyatı",
+                }
+
+        # 1b. m² bulunamadı — toplam ilan fiyatlarını dene
+        serper_total_queries = [
+            f"{loc} satılık daire fiyat",
+            f"{city} {district} satılık konut sahibinden hepsiemlak",
+        ]
+        serper_prices = _serper_prices(serper_total_queries, _PROP_MIN, _PROP_MAX, trace)
+        if len(serper_prices) >= 3:
+            cleaned = _remove_outliers_iqr(serper_prices)
+            if len(cleaned) < 2:
+                cleaned = serper_prices
+            median = int(statistics.median(cleaned))
+            m2p = round(median / max(square_meters, 1))
+            log.info(f"Serper konut toplam-fiyat tier1: n={len(cleaned)} median=₺{median:,}")
+            if trace is not None:
+                trace.append({"step": "aggregate_property", "source": "serper_total",
+                               "tier": 1, "raw": serper_prices, "cleaned": cleaned,
+                               "median": median})
+            return {
+                "rag_used": True, "tier": 1,
+                "property_estimated_value": median,
+                "avg_m2_price": m2p,
+                "confidence": "medium",
+                "price_count": len(cleaned),
+                "reasoning": f"{loc} {square_meters}m² — Serper/Google'dan {len(cleaned)} ilan toplam fiyatı medyanı.",
+                "source": "Serper.dev (Google toplam fiyat)",
+            }
 
     # ── ADIM 2: Claude web_search ──────────────────────────────────────────────
     api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -482,26 +586,33 @@ def _live_search_property(
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
         prompt = (
-            f"Türkiye konut pazarında {loc} bölgesinde {square_meters:.0f} m² satılık daire fiyatını araştır.\n\n"
-            f"ADIM 1 — Arama yap:\n"
-            f"  • \"{loc} satılık daire fiyat\"\n"
-            f"  • \"{loc} {square_meters:.0f} m² daire sahibinden\"\n"
-            f"  • \"{city} {district} konut m2 fiyat 2025\"\n\n"
-            f"ADIM 2 — Fiyat topla (KRİTİK KURALLAR):\n"
-            f"  ✅ Sadece 'TL' veya '₺' ile yazılmış SATIŞ fiyatları\n"
-            f"  ❌ KİRALIK fiyatlar — bunlar çok düşük, SATIŞ DEĞİL\n"
-            f"  ❌ m² birim fiyatları — bunları toplam fiyata çevir ({square_meters:.0f} ile çarp)\n"
-            f"  ❌ 2024 öncesi eski fiyatlar\n\n"
-            f"ADIM 3 — Akıl yürüt:\n"
-            f"  2026 Türkiye'de {loc} bölgesinde {square_meters:.0f} m² daire makul olarak ne eder?\n"
-            f"  Snippet'lerdeki rakamları bu beklentiyle karşılaştır, anlamsız değerleri filtrele.\n\n"
+            f"Türkiye konut pazarında {loc} bölgesinde {square_meters:.0f} m² satılık daire değerini araştır.\n\n"
+            f"ADIM 1 — ÖNCELİKLE m² birim fiyatı ara:\n"
+            f"  • \"{loc} daire m2 satış fiyatı 2025\"\n"
+            f"  • \"{city} {district} konut ortalama m2 fiyat\"\n"
+            f"  • \"endeksa {loc} m2 fiyatı\"\n\n"
+            f"ADIM 2 — Eğer m² birim fiyatı bulamazsan toplam ilan fiyatı ara:\n"
+            f"  • \"{loc} {square_meters:.0f} m² daire sahibinden satılık\"\n"
+            f"  • \"{loc} satılık daire fiyat\"\n\n"
+            f"ADIM 3 — HESAPLAMA KURALLARI (ÇOK ÖNEMLİ):\n"
+            f"  ✅ m² birim fiyatı bulduysan: birim_fiyat × {square_meters:.0f} = TOPLAM DEĞİL\n"
+            f"     Bu hesabı yap, 'listing' listesine TOPLAM rakamı yaz\n"
+            f"  ✅ Sadece SATIŞ fiyatları, 'TL' veya '₺' ile yazılmış\n"
+            f"  ❌ KİRALIK fiyatlar — SATIŞ DEĞİL, atla\n"
+            f"  ❌ 2024 öncesi eski fiyatlar\n"
+            f"  ❌ Sıfır/proje aşaması fiyatları\n\n"
+            f"ADIM 4 — Expert tahmin:\n"
+            f"  2026 Türkiye'de {loc} bölgesinde {square_meters:.0f} m² daire makul fiyat aralığı nedir?\n"
+            f"  Snippet'lerden bulunan m² birim fiyatıyla veya toplam ilanlarla destekle.\n\n"
+            f"  Örnek: Esenyurt 2025 m² ~40.000-55.000 TL → 65m² = 2.6M-3.6M TL\n\n"
             f"Yanıtı SADECE şu JSON formatında ver, başka metin yazma:\n"
             f"{{\n"
-            f"  \"listings\": [4500000, 5200000, 6100000],\n"
-            f"  \"expert_low\": 4000000,\n"
-            f"  \"expert_high\": 7000000,\n"
-            f"  \"expert_estimate\": 5500000,\n"
-            f"  \"note\": \"3 ilan bulundu, kiralık fiyatlar atlandı\"\n"
+            f"  \"m2_unit_prices\": [42000, 48000],\n"
+            f"  \"listings\": [2730000, 3120000],\n"
+            f"  \"expert_low\": 2500000,\n"
+            f"  \"expert_high\": 3800000,\n"
+            f"  \"expert_estimate\": 3100000,\n"
+            f"  \"note\": \"Esenyurt 45.000 TL/m² medyanı × 65m² hesabıyla\"\n"
             f"}}"
         )
 
@@ -519,6 +630,51 @@ def _live_search_property(
                 return n if 200_000 <= n <= 500_000_000 else None
             except (ValueError, TypeError):
                 return None
+
+        # ── Önce Claude'un m²/birim fiyatlarını kontrol et ────────────────
+        claude_m2_unit: list[int] = []
+        for p in (data.get("m2_unit_prices") or []):
+            try:
+                v = int(str(p).replace(".", "").replace(",", ""))
+                if 8_000 <= v <= 400_000:
+                    claude_m2_unit.append(v)
+            except (ValueError, TypeError):
+                pass
+
+        # Serbest metinden de m² birim fiyatlarını çek
+        text_m2_units = _extract_m2_unit_prices(full_text)
+        for v in text_m2_units:
+            if v not in claude_m2_unit:
+                claude_m2_unit.append(v)
+
+        if len(claude_m2_unit) >= 2:
+            cleaned_m2 = _remove_outliers_iqr(claude_m2_unit)
+            if len(cleaned_m2) < 2:
+                cleaned_m2 = claude_m2_unit
+            median_m2 = int(statistics.median(cleaned_m2))
+            total = round(median_m2 * square_meters)
+            if _PROP_MIN <= total <= _PROP_MAX:
+                log.info(f"prop web-search m²-birim tier1: m2p=₺{median_m2:,} × {square_meters}m² = ₺{total:,}")
+                if trace is not None:
+                    trace.append({
+                        "step": "aggregate_property", "source": "claude_m2_unit",
+                        "tier": 1, "unit_prices": claude_m2_unit,
+                        "median_m2_price": median_m2,
+                        "square_meters": square_meters,
+                        "total": total,
+                    })
+                return {
+                    "rag_used": True, "tier": 1,
+                    "property_estimated_value": total,
+                    "avg_m2_price": median_m2,
+                    "confidence": "high" if len(cleaned_m2) >= 3 else "medium",
+                    "price_count": len(cleaned_m2),
+                    "reasoning": (
+                        f"{loc}: ₺{median_m2:,}/m² × {square_meters:.0f}m² = ₺{total:,} "
+                        f"(Claude web_search m² birim fiyatı)."
+                    ),
+                    "source": "Claude web_search — m² birim fiyatı",
+                }
 
         listings: list[int] = []
         for p in (data.get("listings") or []):
@@ -621,12 +777,20 @@ def rag_estimate_car(
     brand: str, model: str, year: int,
     has_damage: bool = False, ocr_text: str = "",
 ) -> dict:
+    # Cache: aynı araç için 30 dk içinde tekrar sorulursa aynı sonucu dön
+    cache_key = f"car:{brand.lower()}:{model.lower()}:{year}:{has_damage}"
+    cached = _cache_get(cache_key)
+    if cached:
+        cached["from_cache"] = True
+        return cached
+
     trace: list = []
     log.info(f"rag_estimate_car: {year} {brand} {model} damage={has_damage}")
 
     live = _live_search_price(brand, model, year, has_damage, trace=trace)
     if live:
         live["debug_trace"] = trace
+        _cache_set(cache_key, live)
         return live
 
     # Fallback: marka formülü
@@ -644,7 +808,7 @@ def rag_estimate_car(
         "damage_factor": damage_factor,
         "result": val,
     })
-    return {
+    result = {
         "rag_used": False,
         "estimated_car_value": val,
         "confidence": "low",
@@ -652,17 +816,27 @@ def rag_estimate_car(
         "source": "marka bazlı formül",
         "debug_trace": trace,
     }
+    _cache_set(cache_key, result)
+    return result
 
 
 def rag_estimate_property(
     city: str, district: str, square_meters: float, ocr_text: str = "",
 ) -> dict:
+    # Cache: aynı konum + m² için 30 dk içinde tekrar sorulursa aynı sonucu dön
+    cache_key = f"prop:{(city or '').lower()}:{(district or '').lower()}:{int(square_meters)}"
+    cached = _cache_get(cache_key)
+    if cached:
+        cached["from_cache"] = True
+        return cached
+
     trace: list = []
     log.info(f"rag_estimate_property: {city} {district} {square_meters}m²")
 
     live = _live_search_property(city, district, square_meters, trace=trace)
     if live:
         live["debug_trace"] = trace
+        _cache_set(cache_key, live)
         return live
 
     # Fallback: şehir bazlı formül
@@ -679,7 +853,7 @@ def rag_estimate_property(
         "square_meters": square_meters,
         "result": val,
     })
-    return {
+    fallback_result = {
         "rag_used": False,
         "property_estimated_value": val,
         "avg_m2_price": m2,
@@ -688,3 +862,5 @@ def rag_estimate_property(
         "source": "şehir bazlı formül",
         "debug_trace": trace,
     }
+    _cache_set(cache_key, fallback_result)
+    return fallback_result
