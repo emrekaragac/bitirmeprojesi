@@ -173,6 +173,13 @@ def analyze_house(file_path: str) -> Optional[dict]:
 
     prompt = f"""Bu belgeyi incele. Türk tapusu (tapu senedi) olup olmadığını belirle.
 
+ÖNEMLİ ALAN AYRIMI:
+- "Yüz Ölçümü" alanı = ARSA/PARSEL alanı (toplam taşınmaz), daire m² DEĞİL
+- "Kat İrtifakı" belgesinde dairenin gerçek m²'si genellikle tapuda YOK
+- "Arsa Payı" (örn: 5/100) = kişinin arsa üzerindeki hisse oranı
+- "Bağımsız Bölüm" niteliği (MESKEN vb.) = dairenin tipi
+- "Kat" (Bodrum/Zemin/1/2...) = dairenin bulunduğu kat
+
 {_MARKET}
 
 Sadece JSON döndür, başka metin yazma:
@@ -182,7 +189,11 @@ Sadece JSON döndür, başka metin yazma:
   "il": "şehir adı veya null",
   "ilce": "ilçe adı veya null",
   "mahalle": "mahalle adı veya null",
-  "yuzolcumu_m2": alan m² (sayı) veya null,
+  "tapu_turu": "Kat İrtifakı / Kat Mülkiyeti / Müstakil / Arsa / Tarla veya null",
+  "arsa_yuzolcumu_m2": TAPU'daki Yüz Ölçümü alanındaki rakam (sayı) veya null,
+  "arsa_payi": "5/100 gibi pay/payda string veya null",
+  "daire_m2": sadece belgede açıkça yazıyorsa daire net m² (sayı), yoksa null,
+  "kat": "Bodrum/Zemin/1/2/3 vb veya null",
   "nitelik": "Daire/Arsa/Villa/Tarla vb veya null",
   "price_per_m2": tahmini m² fiyatı TL (tam sayı) veya null,
   "estimated_value_tl": tahmini toplam değer TL (tam sayı) veya null,
@@ -204,18 +215,49 @@ Sadece JSON döndür, başka metin yazma:
     if val and not (500_000 <= int(val) <= 500_000_000):
         val = None
 
+    # ── Gerçek daire m²'sini hesapla ─────────────────────────────────────────
+    # Öncelik: belgedeki açık daire_m2 > arsa payı hesabı > None
+    daire_m2 = data.get("daire_m2")
+    arsa_m2  = data.get("arsa_yuzolcumu_m2")
+    arsa_payi_str = data.get("arsa_payi")  # "5/100"
+    tapu_turu = data.get("tapu_turu", "")
+    kat = data.get("kat", "")
+
+    if not daire_m2 and arsa_m2 and arsa_payi_str:
+        # Kat irtifakı: arsa payından daire m²'si tahmin et
+        try:
+            pay, payda = arsa_payi_str.replace(" ", "").split("/")
+            oran = int(pay) / int(payda)
+            # Arsa payı × parsel = dairenin tahmini büyüklüğü
+            # Ancak bu genellikle çok küçük çıkar (örn. 5/100 × 239 = 12 m²)
+            # Makul alt sınır 40 m²
+            hesap = round(arsa_m2 * oran)
+            daire_m2 = max(hesap, 40) if hesap < 40 else hesap
+        except Exception:
+            daire_m2 = None
+
+    # Kat İrtifakı'nda yüzölçümü arsa alanıdır — fiyatlamada kullanma
+    # Bodrum kat değer düşüklüğü notu
+    bodrum_notu = ""
+    if kat and "bodrum" in str(kat).lower():
+        bodrum_notu = " (Bodrum kat — değer düşük olabilir)"
+
     return {
         "valid": is_valid,
         "message": "✅ Geçerli Tapu Senedi." if is_valid else f"❌ {data.get('red_reason', 'Bu belge tapu senedi değil.')}",
-        "il":         data.get("il"),
-        "ilce":       data.get("ilce"),
-        "mahalle":    data.get("mahalle"),
-        "yuzolcumu":  data.get("yuzolcumu_m2"),
-        "nitelik":    data.get("nitelik"),
+        "il":           data.get("il"),
+        "ilce":         data.get("ilce"),
+        "mahalle":      data.get("mahalle"),
+        "yuzolcumu":    daire_m2,          # Artık daire m²'si (arsa değil)
+        "arsa_yuzolcumu": arsa_m2,         # Ham arsa alanı (referans)
+        "arsa_payi":    arsa_payi_str,
+        "tapu_turu":    tapu_turu,
+        "kat":          kat,
+        "nitelik":      data.get("nitelik"),
         "price_per_m2":       int(m2p) if m2p else None,
         "estimated_value_tl": int(val) if val else None,
-        "confidence": data.get("confidence", "medium"),
-        "reasoning":  data.get("reasoning", ""),
+        "confidence":   data.get("confidence", "medium"),
+        "reasoning":    data.get("reasoning", "") + bodrum_notu,
     }
 
 
