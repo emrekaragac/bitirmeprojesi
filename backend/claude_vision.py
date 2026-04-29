@@ -50,14 +50,21 @@ DOC_NAMES = {
 
 # ── PDF → Base64 JPEG ─────────────────────────────────────────────────────────
 def pdf_to_base64(file_path: str, max_pages: int = 1) -> list[str]:
-    """PDF sayfalarını base64 JPEG listesine çevirir. PyMuPDF kullanır."""
+    """PDF sayfalarını base64 JPEG listesine çevirir. PyMuPDF kullanır.
+
+    96 DPI: belge okunabilirliğini korurken ~3x daha az RAM kullanır.
+    150 DPI → ~6MB/sayfa  |  96 DPI → ~2.5MB/sayfa (Render free 512MB için kritik)
+    """
     result = []
     try:
         import fitz
         doc = fitz.open(file_path)
         for i in range(min(max_pages, len(doc))):
-            pix = doc[i].get_pixmap(matrix=fitz.Matrix(150/72, 150/72), colorspace=fitz.csRGB)
-            result.append(base64.standard_b64encode(pix.tobytes("jpeg", jpg_quality=85)).decode())
+            pix = doc[i].get_pixmap(matrix=fitz.Matrix(96/72, 96/72), colorspace=fitz.csRGB)
+            jpeg_bytes = pix.tobytes("jpeg", jpg_quality=75)
+            result.append(base64.standard_b64encode(jpeg_bytes).decode())
+            del pix          # RAM'i hemen serbest bırak
+            del jpeg_bytes
         doc.close()
     except Exception as e:
         print(f"[Vision] pdf_to_base64 error: {e}")
@@ -73,7 +80,7 @@ def _call_vision(images_b64: list[str], prompt: str) -> Optional[str]:
         import anthropic
         content = [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}}
-            for b64 in images_b64[:2]
+            for b64 in images_b64[:1]   # RAM tasarrufu: 1 sayfa yeterli
         ]
         content.append({"type": "text", "text": prompt})
         resp = anthropic.Anthropic(api_key=api_key).messages.create(
