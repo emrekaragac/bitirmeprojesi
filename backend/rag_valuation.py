@@ -2,11 +2,12 @@
 PSDS — Araç ve Konut Değerleme
 
 Akış:
-  1. Claude web_search → güvenilir Türk satış sitelerinden TL fiyat listesi
-  2. IQR ile outlier filtresi → trimmed median
-  3. Yetersiz veri varsa fallback formül (marka/şehir bazlı)
+  1. Serper.dev (SERPER_API_KEY varsa) → Google snippet'lerinden TL fiyat listesi
+  2. Claude web_search (ANTHROPIC_API_KEY) → fallback arama + expert tahmin
+  3. IQR ile outlier filtresi → trimmed median
+  4. Yetersiz veri varsa marka/şehir bazlı formül
 
-Tüm adımlar `_RAG_TRACE` listesine yazılır → API response'una gömülür → tarayıcı console'unda görünür.
+Tüm adımlar trace listesine yazılır.
 """
 
 import os
@@ -82,6 +83,53 @@ def _extract_prices(text: str, min_val: int, max_val: int) -> list[int]:
             except ValueError:
                 pass
     return sorted(found)
+
+
+def _serper_search(query: str, num: int = 10) -> str:
+    """
+    Serper.dev Google Search API — IP yasağı yok, temiz snippet'ler.
+    SERPER_API_KEY env yoksa boş döner, Claude web_search devreye girer.
+    """
+    api_key = os.getenv("SERPER_API_KEY")
+    if not api_key:
+        return ""
+    try:
+        import httpx
+        resp = httpx.post(
+            "https://google.serper.dev/search",
+            headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
+            json={"q": query, "gl": "tr", "hl": "tr", "num": num},
+            timeout=12,
+        )
+        data = resp.json()
+        parts: list[str] = []
+        for r in data.get("organic", []):
+            parts.append(r.get("title", "") + " " + r.get("snippet", ""))
+        for r in data.get("answerBox", {}).get("snippets", []):
+            parts.append(r)
+        return "\n".join(parts)
+    except Exception as e:
+        log.warning(f"Serper hata: {e}")
+        return ""
+
+
+def _serper_prices(
+    queries: list[str], min_val: int, max_val: int, trace: list | None = None
+) -> list[int]:
+    """Birden fazla sorgu yapıp fiyatları birleştir."""
+    all_prices: list[int] = []
+    for q in queries:
+        text = _serper_search(q)
+        if not text:
+            break  # API key yok — devam etme
+        prices = _extract_prices(text, min_val, max_val)
+        log.info(f"Serper '{q[:50]}' → {len(prices)} fiyat: {prices[:5]}")
+        if trace is not None:
+            trace.append({"step": "serper", "query": q, "prices": prices})
+        all_prices.extend(prices)
+        if len(set(all_prices)) >= 5:
+            break
+    return sorted(set(all_prices))
 
 
 def _remove_outliers_iqr(prices: list[int]) -> list[int]:
@@ -190,6 +238,39 @@ def _live_search_price(
     brand: str, model: str, year: int, has_damage: bool,
     trace: list | None = None,
 ) -> dict | None:
+    _CAR_MIN = 400_000
+    _CAR_MAX = 100_000_000
+
+    # ── ADIM 1: Serper.dev ile canlı Google snippet fiyatları ─────────────────
+    serper_queries = [
+        f"{year} {brand} {model} ikinci el fiyat sahibinden",
+        f"{year} {brand} {model} arabam ikinci el TL",
+        f"{brand} {model} {year} satılık fiyat türkiye",
+    ]
+    serper_prices = _serper_prices(serper_queries, _CAR_MIN, _CAR_MAX, trace)
+    if len(serper_prices) >= 3:
+        cleaned = _remove_outliers_iqr(serper_prices)
+        if len(cleaned) < 2:
+            cleaned = serper_prices
+        median = int(statistics.median(cleaned))
+        if has_damage:
+            median = round(median * 0.82)
+        log.info(f"Serper tier1: n={len(cleaned)} median=₺{median:,}")
+        if trace is not None:
+            trace.append({"step": "aggregate_car", "source": "serper", "tier": 1,
+                          "raw": serper_prices, "cleaned": cleaned, "median": median})
+        return {
+            "rag_used": True, "tier": 1,
+            "estimated_car_value": median,
+            "confidence": "high" if len(cleaned) >= 5 else "medium",
+            "price_count": len(cleaned),
+            "raw_prices": serper_prices,
+            "filtered_prices": cleaned,
+            "reasoning": f"{year} {brand} {model} — Serper/Google'dan {len(cleaned)} ilan medyanı.",
+            "source": "Serper.dev (Google)",
+        }
+
+    # ── ADIM 2: Claude web_search (Anthropic sunucuları, IP yasağı yok) ───────
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         log.warning("ANTHROPIC_API_KEY yok — web search atlandı")
@@ -244,10 +325,6 @@ def _live_search_price(
         log.info(f"car raw: {full_text[:200]}")
 
         data = _parse_json_block(full_text) or {}
-
-        # 2025 Türkiye: en ucuz çalışır araç ~400K TL altına düşmez
-        _CAR_MIN = 400_000
-        _CAR_MAX = 100_000_000
 
         def _to_int(v) -> int | None:
             try:
@@ -364,6 +441,39 @@ def _live_search_property(
     city: str, district: str, square_meters: float,
     trace: list | None = None,
 ) -> dict | None:
+    _PROP_MIN = 500_000
+    _PROP_MAX = 500_000_000
+
+    loc = f"{city} {district}".strip()
+
+    # ── ADIM 1: Serper.dev ile canlı Google snippet fiyatları ─────────────────
+    serper_queries = [
+        f"{loc} satılık daire fiyat",
+        f"{loc} {square_meters:.0f} m2 satılık daire TL",
+        f"{city} {district} satılık konut sahibinden hepsiemlak",
+    ]
+    serper_prices = _serper_prices(serper_queries, _PROP_MIN, _PROP_MAX, trace)
+    if len(serper_prices) >= 3:
+        cleaned = _remove_outliers_iqr(serper_prices)
+        if len(cleaned) < 2:
+            cleaned = serper_prices
+        median = int(statistics.median(cleaned))
+        m2p = round(median / max(square_meters, 1))
+        log.info(f"Serper konut tier1: n={len(cleaned)} median=₺{median:,}")
+        if trace is not None:
+            trace.append({"step": "aggregate_property", "source": "serper", "tier": 1,
+                          "raw": serper_prices, "cleaned": cleaned, "median": median})
+        return {
+            "rag_used": True, "tier": 1,
+            "property_estimated_value": median,
+            "avg_m2_price": m2p,
+            "confidence": "high" if len(cleaned) >= 5 else "medium",
+            "price_count": len(cleaned),
+            "reasoning": f"{loc} {square_meters}m² — Serper/Google'dan {len(cleaned)} ilan medyanı.",
+            "source": "Serper.dev (Google)",
+        }
+
+    # ── ADIM 2: Claude web_search ──────────────────────────────────────────────
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         log.warning("ANTHROPIC_API_KEY yok — konut web search atlandı")
@@ -371,8 +481,6 @@ def _live_search_property(
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
-
-        loc = f"{city} {district}".strip()
         prompt = (
             f"Türkiye konut pazarında {loc} bölgesinde {square_meters:.0f} m² satılık daire fiyatını araştır.\n\n"
             f"ADIM 1 — Arama yap:\n"
