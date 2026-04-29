@@ -199,31 +199,41 @@ def _live_search_price(
         client = anthropic.Anthropic(api_key=api_key)
 
         damage_note = "ARAÇ HASAR KAYITLI — bunu fiyata yansıt (%15-20 düşük)." if has_damage else ""
+        age = max(0, datetime.datetime.now().year - int(year))
+        # Segment tahmini için bağlam — Claude'un expert tahminini gerçekçi tutar
+        segment_hint = (
+            "BMW, Mercedes-Benz, Audi, Porsche, Land Rover, Volvo gibi premium/lüks markalar "
+            "Türkiye'de 2026 yılında 3M–20M TL aralığındadır."
+            if brand.lower() in {"bmw","mercedes","mercedes-benz","audi","porsche","land rover","volvo","lexus"}
+            else
+            "Volkswagen, Toyota, Ford, Hyundai, Renault, Fiat gibi ana segment araçlar "
+            "Türkiye'de 2026 yılında 800K–4M TL aralığındadır."
+        )
         prompt = (
-            f"Türkiye 2. el otomobil piyasasında {year} {brand} {model} araştır.\n\n"
+            f"Türkiye 2. el otomobil piyasasında {year} {brand} {model} fiyatını araştır.\n\n"
             f"ADIM 1 — Arama yap:\n"
             f"  • \"{year} {brand} {model} ikinci el fiyat\"\n"
             f"  • \"{year} {brand} {model} sahibinden\"\n"
             f"  • \"{year} {brand} {model} arabam\"\n\n"
             f"ADIM 2 — Fiyat topla (KRİTİK KURALLAR):\n"
-            f"  ✅ Sadece 'TL' veya '₺' sembolüyle birlikte yazılan SATIŞ fiyatları al\n"
-            f"  ❌ Kilometre değerleri (örn: 150.000 km) — bunlar FIYAT DEĞİL\n"
-            f"  ❌ Model yılı rakamları (2010, 2015 vb.) — bunlar FIYAT DEĞİL\n"
-            f"  ❌ Yedek parça, kira, 0 km yeni araç fiyatları\n"
-            f"  ❌ 2024 öncesi tarihli eski fiyatlar (enflasyon nedeniyle geçersiz)\n\n"
-            f"ADIM 3 — Akıl yürüt:\n"
-            f"  2026 Türkiye'de ÇALIŞIR HERHANGİ BİR ARAÇ en az 400.000 TL'dir.\n"
-            f"  Bu aracın segmenti ve yaşını düşün: makul fiyat aralığı ne olmalı?\n"
-            f"  Snippet'lerde bu aralığın dışında rakamlar varsa muhtemelen km veya hata — atla.\n"
+            f"  ✅ 'TL' veya '₺' sembolüyle birlikte yazılan SATIŞ fiyatları\n"
+            f"  ❌ Kilometre değerleri (50.000 km, 120.000 km) — FIYAT DEĞİL\n"
+            f"  ❌ Model yılı rakamları (2010, 2022 vb.) — FIYAT DEĞİL\n"
+            f"  ❌ Yedek parça, kira, 0 km yeni araç, ağır hasarlı ilanlar\n\n"
+            f"ADIM 3 — Expert tahmin yap (ZORUNLU):\n"
+            f"  Araç: {year} {brand} {model}, yaşı {age} yıl.\n"
+            f"  {segment_hint}\n"
+            f"  Türkiye yüksek enflasyon ekonomisi — fiyatlar her yıl büyük artıyor.\n"
+            f"  Bulduğun gerçek ilanlarla + segment bilginle expert_low/high/estimate belirle.\n"
             f"  {damage_note}\n\n"
-            f"Yanıtı SADECE şu JSON formatında ver, başka metin yazma:\n"
+            f"SADECE şu JSON formatında yanıt ver, başka hiçbir metin yazma:\n"
             f"{{\n"
-            f"  \"listings\": [1100000, 1250000, 980000],\n"
-            f"  \"expert_low\": 900000,\n"
-            f"  \"expert_high\": 1400000,\n"
-            f"  \"expert_estimate\": 1100000,\n"
-            f"  \"segment\": \"premium hatchback, 16 yıllık\",\n"
-            f"  \"note\": \"3 ilan snippet'i bulundu, km değerleri filtrelendi\"\n"
+            f"  \"listings\": [13200000, 14500000],\n"
+            f"  \"expert_low\": 12000000,\n"
+            f"  \"expert_high\": 15000000,\n"
+            f"  \"expert_estimate\": 13500000,\n"
+            f"  \"segment\": \"lüks sedan, 4 yıllık, 330 BG dizel\",\n"
+            f"  \"note\": \"1 gerçek ilan + segment bilgisiyle tahmin\"\n"
             f"}}"
         )
 
