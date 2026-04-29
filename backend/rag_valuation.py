@@ -238,10 +238,14 @@ def _live_search_price(
 
         data = _parse_json_block(full_text) or {}
 
+        # 2025 Türkiye: en ucuz çalışır araç ~400K TL altına düşmez
+        _CAR_MIN = 400_000
+        _CAR_MAX = 100_000_000
+
         def _to_int(v) -> int | None:
             try:
                 n = int(str(v).replace(".", "").replace(",", ""))
-                return n if 50_000 <= n <= 100_000_000 else None
+                return n if _CAR_MIN <= n <= _CAR_MAX else None
             except (ValueError, TypeError):
                 return None
 
@@ -253,7 +257,7 @@ def _live_search_price(
 
         # JSON yoksa serbest metinden çekmeyi de dene
         if len(listings) < 3:
-            for p in _extract_prices(full_text, 50_000, 100_000_000):
+            for p in _extract_prices(full_text, _CAR_MIN, _CAR_MAX):
                 if p not in listings:
                     listings.append(p)
 
@@ -292,6 +296,11 @@ def _live_search_price(
         expert = _to_int(data.get("expert_estimate"))
         elow   = _to_int(data.get("expert_low"))
         ehigh  = _to_int(data.get("expert_high"))
+
+        # Expert tahmin de mantıklı aralıkta olmalı
+        if expert is not None and expert < _CAR_MIN:
+            log.warning(f"expert_estimate {expert} < minimum {_CAR_MIN}, Tier2 atlanıyor")
+            expert = None
 
         if expert is not None and elow is not None and ehigh is not None and elow <= ehigh:
             # has_damage zaten prompt'ta verildi, bu yüzden %82 indirimi tekrar uygulamıyoruz
