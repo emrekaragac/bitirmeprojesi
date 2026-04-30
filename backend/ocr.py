@@ -44,11 +44,17 @@ DOC_SIGNATURES: dict = {
     },
     "income_file": {
         "name": "Gelir / Maaş Belgesi",
-        "required_any": ["BORDRO", "MAAŞ BORDROSU", "SGK", "NET ÜCRET", "BRÜT ÜCRET", "GELİR VERGİSİ", "AYLIK ÜCRETİ"],
+        "required_any": [
+            # Bordro
+            "BORDRO", "MAAŞ BORDROSU", "SGK", "NET ÜCRET", "BRÜT ÜCRET", "GELİR VERGİSİ",
+            # Hesap ekstresi
+            "HESAP HAREKETLERİ", "MAAŞ ÖDEMESİ",
+        ],
         "keywords": [
             "BORDRO", "MAAŞ", "SGK", "NET ÜCRET", "BRÜT", "GELİR VERGİSİ",
             "AYLIK ÜCRETİ", "SOSYAL GÜVENLİK", "PRİM", "KESİNTİ",
-            "ÖDEME TUTARI", "ÇALIŞAN",
+            # Hesap ekstresi ek keyword'ler
+            "HESAP HAREKETLERİ", "BAKIYE", "IBAN", "MAAŞ ÖDEMESİ",
         ],
         "min_hits": 3,
     },
@@ -72,7 +78,7 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
       2. Metin yoksa (fotoğraf PDF) → Claude Vision ile görsel analiz
       3. Vision yanıt vermezse → uyarıyla kabul et (bloke etme)
     """
-    from backend.claude_vision import analyze_car, analyze_house, analyze_generic, analyze_transcript
+    from backend.claude_vision import analyze_car, analyze_house, analyze_generic, analyze_transcript, analyze_income
 
     sig = DOC_SIGNATURES.get(expected_doc_id)
     if not sig:
@@ -96,6 +102,9 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             if expected_doc_id == "transcript_file":
                 pt = parse_transcript(file_path)
                 extra = {k: pt[k] for k in ("gno", "sistem", "universite", "bolum") if pt.get(k) is not None}
+            elif expected_doc_id == "income_file":
+                pi = parse_income(file_path)
+                extra = {k: pi[k] for k in ("net_aylik", "income_bracket", "kaynak") if pi.get(k) is not None}
             return {"valid": True, "message": f"✅ Geçerli {sig['name']} tespit edildi.",
                     "confidence": round(hits / len(sig["keywords"]), 2), "hits": hits, **extra}
 
@@ -123,6 +132,8 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             result = analyze_house(file_path)
         elif expected_doc_id == "transcript_file":
             result = analyze_transcript(file_path)
+        elif expected_doc_id == "income_file":
+            result = analyze_income(file_path)
         else:
             result = analyze_generic(file_path, expected_doc_id)
 
@@ -148,6 +159,8 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
                 "il","ilce","yuzolcumu","tapu_turu","nitelik","arsa_payi","kat","price_per_m2","reasoning",
                 # Transkript
                 "universite","bolum","sinif","gno","sistem","donem_sayisi",
+                # Gelir
+                "net_aylik","income_bracket","kaynak",
             ) if k in result},
         }
 
@@ -305,6 +318,64 @@ def parse_transcript(file_path: str) -> dict:
     )
     if bolum_match:
         result["bolum"] = bolum_match.group(1).strip()
+
+    return result
+
+
+def _parse_tr_amount(s: str) -> float:
+    """'21.126,68' → 21126.68  (Türkçe binlik nokta, ondalık virgül)"""
+    return float(s.replace(".", "").replace(",", "."))
+
+
+def _amount_to_bracket(amount: float) -> str:
+    if amount < 22_000:   return "under_22000"
+    if amount < 40_000:   return "22000_40000"
+    if amount < 75_000:   return "40000_75000"
+    if amount < 150_000:  return "75000_150000"
+    return "over_150000"
+
+
+def parse_income(file_path: str) -> dict:
+    """Bordro veya banka ekstresi PDF'inden aylık net geliri çıkar."""
+    text = extract_text(file_path)
+    result: dict = {
+        "net_aylik": None,
+        "income_bracket": None,
+        "kaynak": None,
+        "raw_text": text[:2000] if text else "",
+        "ocr_success": bool(text and len(text) > 20),
+    }
+
+    if not text:
+        return result
+
+    # ── 1. BORDRO: NET ÖDENEN satırı ──────────────────────────────
+    net_match = re.search(r'NET\s*ÖDENEN\s+([\d.]+,\d+)', text, re.IGNORECASE)
+    if net_match:
+        try:
+            result["net_aylik"] = _parse_tr_amount(net_match.group(1))
+            result["kaynak"] = "bordro"
+        except Exception:
+            pass
+
+    # ── 2. BANKA EKSTRESİ: "Maaş" etiketli kredi satırları ───────
+    if result["net_aylik"] is None:
+        # Format: "<açıklama> Maaş +75.000,00 TL <bakiye>"
+        all_lines = re.findall(r'([^\n]*?Maaş\s+\+([\d.]+,\d+)\s*TL)', text)
+        monthly_salaries = []
+        for line, amount_str in all_lines:
+            if "AVANS" in line.upper():
+                continue  # avans ayrı satır, aylık maaş değil
+            try:
+                monthly_salaries.append(_parse_tr_amount(amount_str))
+            except Exception:
+                pass
+        if monthly_salaries:
+            result["net_aylik"] = sum(monthly_salaries) / len(monthly_salaries)
+            result["kaynak"] = "ekstre"
+
+    if result["net_aylik"] is not None:
+        result["income_bracket"] = _amount_to_bracket(result["net_aylik"])
 
     return result
 

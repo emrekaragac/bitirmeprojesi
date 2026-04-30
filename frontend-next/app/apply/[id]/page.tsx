@@ -191,7 +191,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
   const [docValidation, setDocValidation] = useState<Record<string, {
     status: "checking" | "valid" | "invalid" | "unknown"
     message: string
-    visionUnavailable?: boolean   // true → Vision okuyamadı, manuel giriş gerekebilir
+    visionUnavailable?: boolean
+    netAylik?: number
   }>>({})
 
 
@@ -263,6 +264,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             status: isDefinitelyInvalid ? "invalid" : data.valid ? "valid" : "unknown",
             message: data.message ?? "",
             visionUnavailable,
+            ...(data.net_aylik != null ? { netAylik: data.net_aylik } : {}),
           },
         }))
         // Tapu için Vision'dan çıkarılan il/ilçe/m² bilgilerini otomatik doldur
@@ -281,6 +283,9 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             gpa: String(data.gno),
             ...(data.sistem ? { gpa_system: String(data.sistem) } : {}),
           }))
+        }
+        if (key === "income_file" && data.valid && data.income_bracket) {
+          setValues(prev => ({ ...prev, monthly_income: data.income_bracket }))
         }
       } else {
         setDocValidation(prev => ({
@@ -770,6 +775,14 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                         : status === "invalid" ? "text-red-600"
                         : "text-amber-700"}`}>
                         {dv.message}
+                      </p>
+                    )}
+
+                    {/* Gelir belgesi — okunan net gelir göster */}
+                    {file && status === "valid" && docId === "income_file" && docValidation[docId]?.netAylik && (
+                      <p className="mt-2 text-xs font-semibold text-emerald-700">
+                        💰 Okunan aylık net: <strong>₺{Math.round(docValidation[docId].netAylik!).toLocaleString("tr-TR")}</strong>
+                        {" "}— gelir dilimi otomatik seçildi
                       </p>
                     )}
 

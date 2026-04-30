@@ -346,6 +346,62 @@ Sadece JSON döndür, başka metin yazma:
     }
 
 
+def analyze_income(file_path: str) -> Optional[dict]:
+    """
+    Bordro veya banka ekstresi PDF'ini Vision ile analiz et.
+    Döner: {valid, net_aylik, income_bracket, kaynak, message}
+    """
+    images = pdf_to_base64(file_path, max_pages=2)
+    if not images:
+        return None
+
+    prompt = """Bu belgeyi incele. Maaş bordrosu veya banka hesap ekstresi olup olmadığını belirle.
+
+GELİR TESPİTİ KURALLARI:
+- BORDRO: "NET ÖDENEN" veya "NET ÜCRET" satırındaki tutarı al (brüt değil)
+- HESAP EKSTRESİ: "Maaş" etiketli kredi girişlerini bul, AVANS olanları hariç tut, kalanların ortalamasını al
+- Tutar Türk lirası (TL) cinsinden olmalı
+- Başka ülke para birimi veya çok eski tarih → geçersiz
+
+Sadece JSON döndür:
+{
+  "is_income_doc": true/false,
+  "red_reason": "geçersizse kısa Türkçe neden, yoksa null",
+  "net_aylik": aylık net gelir sayı olarak (örn. 21126.68) veya null,
+  "kaynak": "bordro" veya "ekstre" veya null
+}"""
+
+    raw = _call_vision(images, prompt)
+    if not raw:
+        return None
+    data = _parse_json(raw)
+    if not data:
+        return None
+
+    is_valid = bool(data.get("is_income_doc"))
+    net_aylik = None
+    income_bracket = None
+    try:
+        val = data.get("net_aylik")
+        if val is not None:
+            net_aylik = float(val)
+            if net_aylik < 22_000:     income_bracket = "under_22000"
+            elif net_aylik < 40_000:   income_bracket = "22000_40000"
+            elif net_aylik < 75_000:   income_bracket = "40000_75000"
+            elif net_aylik < 150_000:  income_bracket = "75000_150000"
+            else:                       income_bracket = "over_150000"
+    except (TypeError, ValueError):
+        pass
+
+    return {
+        "valid":          is_valid,
+        "message":        "✅ Geçerli Gelir Belgesi." if is_valid else f"❌ {data.get('red_reason', 'Bu belge gelir belgesi değil.')}",
+        "net_aylik":      net_aylik,
+        "income_bracket": income_bracket,
+        "kaynak":         data.get("kaynak"),
+    }
+
+
 # ── DİĞER BELGELER ────────────────────────────────────────────────────────────
 def analyze_generic(file_path: str, doc_type: str) -> Optional[dict]:
     """Transkript, bordro, öğrenci belgesi vb. için sadece doğrulama."""
