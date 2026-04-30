@@ -476,31 +476,89 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
         {step === 0 && (
           <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
-              <h2 className="font-black text-slate-800 text-lg">Your Information</h2>
+              <h2 className="font-black text-slate-800 text-lg">Kişisel Bilgiler</h2>
+
+              {/* Ad / Soyad */}
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { id: "first_name", label: "First Name", req: true },
-                  { id: "last_name",  label: "Last Name",  req: true },
+                  { id: "first_name", label: "Ad", req: true },
+                  { id: "last_name",  label: "Soyad", req: true },
                 ].map(f => (
                   <div key={f.id}>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}{f.req && " *"}</label>
                     <input value={values[f.id] || ""} onChange={e => setVal(f.id, e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400" />
+                      className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400
+                        ${values[f.id] ? "text-slate-900 font-bold border-indigo-300" : "text-slate-400 border-slate-200"}`} />
                   </div>
                 ))}
               </div>
+
+              {/* TC Kimlik */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">TC Kimlik No *</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={11}
+                  value={values["tc_no"] || ""}
+                  onChange={e => setVal("tc_no", e.target.value.replace(/\D/g, "").slice(0, 11))}
+                  className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400
+                    ${values["tc_no"]
+                      ? values["tc_no"].length === 11
+                        ? "text-slate-900 font-bold border-emerald-400"
+                        : "text-slate-900 font-bold border-red-300"
+                      : "text-slate-400 border-slate-200"}`}
+                  placeholder="11 haneli TC kimlik numarası"
+                />
+                {values["tc_no"] && values["tc_no"].length !== 11 && (
+                  <p className="text-xs text-red-500 font-medium mt-1">
+                    ❌ TC kimlik numarası 11 haneli olmalıdır ({values["tc_no"].length}/11)
+                  </p>
+                )}
+              </div>
+
+              {/* Diğer alanlar */}
               {[
-                { id: "tc_no",     label: "TC Identity No",  type: "text" },
-                { id: "birth_date",label: "Date of Birth",   type: "date" },
-                { id: "phone",     label: "Phone",           type: "tel" },
-                { id: "email",     label: "Email",           type: "email" },
-                { id: "university",label: "University",      type: "text" },
-                { id: "department",label: "Department",      type: "text" },
+                { id: "birth_date", label: "Doğum Tarihi",  type: "date" },
+                { id: "phone",      label: "Telefon",        type: "tel" },
               ].map(f => (
                 <div key={f.id}>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}</label>
                   <input type={f.type} value={values[f.id] || ""} onChange={e => setVal(f.id, e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400" />
+                    className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400
+                      ${values[f.id] ? "text-slate-900 font-bold border-indigo-300" : "text-slate-400 border-slate-200"}`} />
+                </div>
+              ))}
+
+              {/* Email — @ kontrolü */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">E-posta *</label>
+                <input
+                  type="email"
+                  value={values["email"] || ""}
+                  onChange={e => setVal("email", e.target.value)}
+                  placeholder="ornek@mail.com"
+                  className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400
+                    ${values["email"]
+                      ? values["email"].includes("@")
+                        ? "text-slate-900 font-bold border-emerald-400"
+                        : "text-slate-900 font-bold border-red-300"
+                      : "text-slate-400 border-slate-200"}`}
+                />
+                {values["email"] && !values["email"].includes("@") && (
+                  <p className="text-xs text-red-500 font-medium mt-1">❌ Geçerli bir e-posta adresi girin (@)</p>
+                )}
+              </div>
+
+              {[
+                { id: "university", label: "Üniversite", type: "text" },
+                { id: "department", label: "Bölüm",      type: "text" },
+              ].map(f => (
+                <div key={f.id}>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}</label>
+                  <input type={f.type} value={values[f.id] || ""} onChange={e => setVal(f.id, e.target.value)}
+                    className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400
+                      ${values[f.id] ? "text-slate-900 font-bold border-indigo-300" : "text-slate-400 border-slate-200"}`} />
                 </div>
               ))}
               <div>
@@ -568,10 +626,14 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
 
             <button
               onClick={() => goStep(1)}
-              disabled={!values.first_name || !values.last_name || !kvkkAccepted}
+              disabled={
+                !values.first_name || !values.last_name || !kvkkAccepted ||
+                (!!values["tc_no"] && values["tc_no"].length !== 11) ||
+                (!!values["email"] && !values["email"].includes("@"))
+              }
               className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Next →
+              Devam Et →
             </button>
           </div>
         )}
