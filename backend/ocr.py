@@ -62,16 +62,6 @@ DOC_SIGNATURES: dict = {
         ],
         "min_hits": 3,
     },
-    "family_registry": {
-        "name": "Nüfus / Aile Kayıt Örneği",
-        "required_any": ["NÜFUS", "VUKUATLI", "NÜFUS MÜDÜRLÜĞÜ", "MERNİS", "KÜTÜKLERİ", "AİLE KÜTÜKLERİ"],
-        "keywords": [
-            "NÜFUS", "AİLE", "KÜTÜKLERİ", "VUKUATLI", "NÜFUS MÜDÜRLÜĞÜ",
-            "TC KİMLİK", "DOĞUM YERİ", "ANA ADI", "BABA ADI",
-            "MERNİS", "E-DEVLET",
-        ],
-        "min_hits": 3,
-    },
     "disability_report": {
         "name": "Sağlık / Engel Raporu",
         "required_any": ["SAĞLIK KURULU", "ENGELLİLİK", "HEYET RAPORU", "ENGELLİLİK ORANI", "SAĞLIK KURULU RAPORU"],

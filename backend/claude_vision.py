@@ -43,8 +43,7 @@ DOC_NAMES = {
     "transcript_file":     "Transkript / Not Dökümü",
     "income_file":         "Maaş Bordrosu / Gelir Belgesi",
     "student_certificate": "Öğrenci Belgesi",
-    "family_registry":     "Nüfus / Aile Kayıt Örneği",
-    "disability_report":   "Sağlık Kurulu / Engel Raporu",
+"disability_report":   "Sağlık Kurulu / Engel Raporu",
 }
 
 

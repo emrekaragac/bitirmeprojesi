@@ -156,8 +156,7 @@ const DOC_LABELS: Record<string, { label: string; icon: string }> = {
   transcript_file:     { label: "Transcript",                    icon: "📋" },
   income_file:         { label: "Income Statement",              icon: "💰" },
   student_certificate: { label: "Student Certificate",           icon: "🎓" },
-  family_registry:     { label: "Family Registry",               icon: "👨‍👩‍👧" },
-  disability_report:   { label: "Health/Disability Report",      icon: "❤️" },
+disability_report:   { label: "Health/Disability Report",      icon: "❤️" },
 }
 
 const PRIORITY_STYLE: Record<string, string> = {
