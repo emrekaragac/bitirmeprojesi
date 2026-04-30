@@ -87,22 +87,22 @@ export default function LandingPage() {
   })
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-violet-50 to-sky-50 flex flex-col">
 
       {/* ── Top Bar ── */}
       <div className="flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2.5">
           <PSSDLogo size={36} />
           <div>
-            <span className="text-white font-black text-lg tracking-tight leading-none block">PSDS</span>
-            <span className="text-indigo-300 text-[10px] leading-none hidden sm:block">Parametric Scholarship Distribution System</span>
+            <span className="text-indigo-900 font-black text-lg tracking-tight leading-none block">PSDS</span>
+            <span className="text-indigo-400 text-[10px] leading-none hidden sm:block">Parametric Scholarship Distribution System</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <a href="/setup" className="text-xs bg-white/10 hover:bg-white/20 transition text-white px-3 py-1.5 rounded-lg font-semibold border border-white/10">
+          <a href="/setup" className="text-xs bg-indigo-600 hover:bg-indigo-700 transition text-white px-3 py-1.5 rounded-lg font-semibold shadow-sm">
             + Create Scholarship
           </a>
-          <a href="/admin" className="text-xs text-indigo-300 hover:text-white transition font-medium">
+          <a href="/admin" className="text-xs text-indigo-500 hover:text-indigo-700 transition font-semibold">
             Admin →
           </a>
         </div>
@@ -110,14 +110,14 @@ export default function LandingPage() {
 
       {/* ── Hero ── */}
       <div className="text-center px-4 pt-6 pb-8">
-        <h1 className="text-3xl sm:text-4xl font-black text-white mb-2 leading-tight">
-          Find Your{" "}
-          <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-            Scholarship
-          </span>
+        <h1 className="text-3xl sm:text-4xl font-black text-indigo-900 mb-2 leading-tight">
+          Bursunu{" "}
+          <span className="bg-gradient-to-r from-indigo-500 to-violet-500 bg-clip-text text-transparent">
+            Bul & Başvur
+          </span>{" "}🎓
         </h1>
-        <p className="text-slate-400 text-sm max-w-md mx-auto">
-          Browse open scholarships and apply directly. Each scholarship has its own criteria and scoring system.
+        <p className="text-slate-500 text-sm max-w-md mx-auto">
+          Açık burs programlarına göz at, hemen başvur. Her bursun kendi kriterleri ve puanlama sistemi var.
         </p>
       </div>
 
@@ -127,21 +127,21 @@ export default function LandingPage() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search scholarships…"
-            className="flex-1 rounded-xl bg-white/10 border border-white/10 text-white placeholder-slate-400 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400"
+            placeholder="Burs ara…"
+            className="flex-1 rounded-xl bg-white border border-indigo-100 text-slate-800 placeholder-slate-400 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm"
           />
           <div className="flex gap-2">
             {(["all","financial","academic","both"] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 py-2 rounded-xl text-xs font-semibold transition capitalize ${
+                className={`px-3 py-2 rounded-xl text-xs font-semibold transition capitalize shadow-sm ${
                   filter === f
-                    ? "bg-indigo-500 text-white"
-                    : "bg-white/10 text-slate-300 hover:bg-white/20 border border-white/10"
+                    ? "bg-indigo-600 text-white shadow-indigo-200 shadow-md"
+                    : "bg-white text-slate-600 hover:bg-indigo-50 border border-indigo-100"
                 }`}
               >
-                {f === "all" ? "All" : f === "both" ? "Both" : f}
+                {f === "all" ? "Hepsi" : f === "both" ? "İkisi" : f === "financial" ? "Finansal" : "Akademik"}
               </button>
             ))}
           </div>
@@ -153,33 +153,31 @@ export default function LandingPage() {
         {loading ? (
           <div className="text-center py-20">
             <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-slate-400 text-sm">Loading scholarships…</p>
+            <p className="text-slate-400 text-sm">Yükleniyor…</p>
           </div>
         ) : fetchError ? (
           <div className="text-center py-20">
             <div className="text-4xl mb-3">⚠️</div>
-            <p className="text-red-400 text-sm mb-1">Could not reach the backend.</p>
-            <p className="text-slate-500 text-xs font-mono mb-1">API: {API}</p>
-            <p className="text-slate-600 text-xs">{fetchError}</p>
+            <p className="text-red-500 text-sm mb-1">Sunucuya ulaşılamadı.</p>
+            <p className="text-slate-400 text-xs font-mono">{fetchError}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-4xl mb-3">{scholarships.length === 0 ? "📭" : "🔍"}</div>
             {scholarships.length === 0 ? (
               <>
-                <p className="text-slate-400 text-sm mb-2">No scholarships available yet.</p>
-                <a href="/setup" className="text-indigo-400 hover:text-indigo-300 text-sm font-semibold underline">
-                  Create the first one →
+                <p className="text-slate-500 text-sm mb-2">Henüz burs eklenmemiş.</p>
+                <a href="/setup" className="text-indigo-500 hover:text-indigo-700 text-sm font-semibold underline">
+                  İlk bursu oluştur →
                 </a>
               </>
             ) : (
-              <p className="text-slate-400 text-sm">No scholarships match your search.</p>
+              <p className="text-slate-500 text-sm">Arama kriterlerine uyan burs bulunamadı.</p>
             )}
           </div>
         ) : (
           <div className="space-y-3 pb-12">
-            {/* Count */}
-            <p className="text-slate-400 text-xs px-1">{filtered.length} scholarship{filtered.length !== 1 ? "s" : ""} available</p>
+            <p className="text-slate-400 text-xs px-1">{filtered.length} burs mevcut</p>
 
             {filtered.map(s => {
               const badge = TYPE_BADGE[s.type] || { label: s.type, color: "bg-slate-100 text-slate-600" }
@@ -188,10 +186,12 @@ export default function LandingPage() {
               return (
                 <div
                   key={s.id}
-                  className={`backdrop-blur border rounded-2xl p-5 transition cursor-pointer group
-                    ${isClosed ? "opacity-60 bg-white/5 border-white/10" :
-                      dl?.urgent ? "bg-orange-500/5 border-orange-500/30 hover:bg-orange-500/10" :
-                      "bg-white/5 border-white/10 hover:bg-white/10"}`}
+                  className={`border rounded-2xl p-5 transition cursor-pointer group shadow-sm
+                    ${isClosed
+                      ? "opacity-50 bg-slate-100 border-slate-200 cursor-default"
+                      : dl?.urgent
+                        ? "bg-orange-50 border-orange-200 hover:border-orange-400 hover:shadow-md"
+                        : "bg-white border-indigo-100 hover:border-indigo-300 hover:shadow-md"}`}
                   onClick={() => !isClosed && router.push(`/apply/${s.id}`)}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -202,34 +202,32 @@ export default function LandingPage() {
                         </span>
                         {s.type === "both" && (
                           <span className="text-xs text-slate-400">
-                            {s.financial_weight}% Financial · {s.academic_weight}% Academic
+                            {s.financial_weight}% Finansal · {s.academic_weight}% Akademik
                           </span>
                         )}
                         {isClosed && (
-                          <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-semibold">
-                            Closed
+                          <span className="text-xs bg-red-100 text-red-500 px-2 py-0.5 rounded-full font-semibold">
+                            Kapalı
                           </span>
                         )}
                       </div>
-                      <h2 className="text-white font-black text-lg group-hover:text-indigo-300 transition leading-tight">
+                      <h2 className={`font-black text-lg leading-tight transition
+                        ${isClosed ? "text-slate-400" : "text-slate-800 group-hover:text-indigo-600"}`}>
                         {s.name}
                       </h2>
                       {s.description && (
-                        <p className="text-slate-400 text-sm mt-1 line-clamp-2">{s.description}</p>
+                        <p className="text-slate-500 text-sm mt-1 line-clamp-2">{s.description}</p>
                       )}
-                      <div className="flex items-center gap-4 mt-3">
-                        {s.deadline && (
-                          <span className="text-xs text-slate-400 flex items-center gap-1">
-                            <span>📅</span> <DeadlineBadge deadline={s.deadline} />
-                          </span>
-                        )}
-                        <span className="text-xs font-mono text-slate-500">#{s.id}</span>
-                      </div>
+                      {s.deadline && (
+                        <div className="mt-2">
+                          <DeadlineBadge deadline={s.deadline} />
+                        </div>
+                      )}
                     </div>
 
                     {!isClosed && (
                       <div className="shrink-0">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-500/20 group-hover:bg-indigo-500/40 transition flex items-center justify-center text-indigo-300 text-lg">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-100 group-hover:bg-indigo-600 transition flex items-center justify-center text-indigo-500 group-hover:text-white text-lg font-bold">
                           →
                         </div>
                       </div>
@@ -243,8 +241,8 @@ export default function LandingPage() {
       </div>
 
       {/* ── Footer ── */}
-      <div className="text-center py-4 text-slate-600 text-xs border-t border-white/5">
-        PSDS © 2024 — Parametric Scholarship Distribution System
+      <div className="text-center py-4 text-slate-400 text-xs border-t border-indigo-100">
+        PSDS © 2025 — Parametrik Burs Dağıtım Sistemi
       </div>
     </div>
   )
