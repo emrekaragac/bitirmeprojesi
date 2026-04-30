@@ -276,12 +276,12 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             ...(data.yuzolcumu  && !prev.square_meters  ? { square_meters: String(data.yuzolcumu) } : {}),
           }))
         }
-        // Transkript için Vision'dan çıkarılan GNO/sistem bilgilerini otomatik doldur
+        // Transkript için Vision'dan çıkarılan GNO/sistem bilgilerini doldur — her yüklemede güncelle
         if (key === "transcript_file" && data.valid && data.gno != null) {
           setValues(prev => ({
             ...prev,
-            ...(data.gno    != null && !prev.gpa        ? { gpa:        String(data.gno) }    : {}),
-            ...(data.sistem         && !prev.gpa_system  ? { gpa_system: String(data.sistem) } : {}),
+            gpa: String(data.gno),
+            ...(data.sistem ? { gpa_system: String(data.sistem) } : {}),
           }))
         }
       } else {

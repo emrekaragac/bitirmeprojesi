@@ -301,10 +301,15 @@ def parse_transcript(file_path: str) -> dict:
         except Exception:
             pass
 
-    # Notlama sistemi — "4.00 üzerindendir" / "Not ortalamaları 4.00 üzerindendir"
-    if re.search(r'4[.,]00\s*\w*zerindendir', text, re.IGNORECASE):
+    # Notlama sistemi — çeşitli format kalıpları
+    if (re.search(r'4[.,]00\s*\w*zerindendir', text, re.IGNORECASE)
+            or re.search(r'4[`\'‘’]l[uü]k\s*not\s*sistem', text, re.IGNORECASE)
+            or re.search(r'4[.,]0\s*scale', text, re.IGNORECASE)
+            or re.search(r'not\s*sistem[i:]?\s*4', text, re.IGNORECASE)):
         result["sistem"] = "4"
-    elif re.search(r'100\s*\w*zerindendir', text, re.IGNORECASE):
+    elif (re.search(r'100\s*\w*zerindendir', text, re.IGNORECASE)
+            or re.search(r'100[`\'‘’]l[uü]k\s*not\s*sistem', text, re.IGNORECASE)
+            or re.search(r'100\s*scale', text, re.IGNORECASE)):
         result["sistem"] = "100"
 
     # Üniversite adı — ilk birkaç satırda bulunur
