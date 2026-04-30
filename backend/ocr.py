@@ -98,13 +98,17 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
     if not sig:
         return {"valid": True, "message": "Belge alındı.", "vision_unavailable": False}
 
+    def _tu(s: str) -> str:
+        # Python upper(): 'i'→'I' (ASCII), 'İ' stays 'İ'. Normalize both to I.
+        return s.upper().replace("İ", "I")  # İ → I
+
     # 1. Metin tabanlı kontrol (dijital PDF'ler için)
     text = extract_text(file_path)
     if text and len(text.strip()) >= 80:
-        text_upper = text.upper()
+        text_upper = _tu(text)
         required_any = sig.get("required_any", [])
-        has_anchor = not required_any or any(kw in text_upper for kw in required_any)
-        hits = sum(1 for kw in sig["keywords"] if kw in text_upper)
+        has_anchor = not required_any or any(_tu(kw) in text_upper for kw in required_any)
+        hits = sum(1 for kw in sig["keywords"] if _tu(kw) in text_upper)
         valid = has_anchor and hits >= sig["min_hits"]
 
         if valid:
@@ -286,9 +290,9 @@ def parse_transcript(file_path: str) -> dict:
     if not text:
         return result
 
-    # GNO / CGPA
+    # GNO / CGPA  — \w+ covers ı (dotless-i) in "Ortalaması"
     gno_match = re.search(
-        r'(?:GNO|GENEL\s+NOT\s+ORTALAMAS[Iİ]|CGPA|GPA|GENEL\s+ORTALAMA)[:\s]*(\d+[.,]\d+)',
+        r'(?:GNO|GENEL\s+NOT\s+ORTALAMA\w*|CGPA|GPA|GENEL\s+ORTALAMA)[:\s]*(\d+[.,]\d+)',
         text, re.IGNORECASE,
     )
     if gno_match:
@@ -297,10 +301,10 @@ def parse_transcript(file_path: str) -> dict:
         except Exception:
             pass
 
-    # Notlama sistemi
-    if re.search(r'4[.,]00\s*(?:[ÜU]ZERINDEN|OVER)', text, re.IGNORECASE):
+    # Notlama sistemi — "4.00 üzerindendir" / "Not ortalamaları 4.00 üzerindendir"
+    if re.search(r'4[.,]00\s*\w*zerindendir', text, re.IGNORECASE):
         result["sistem"] = "4"
-    elif re.search(r'100\s*(?:[ÜU]ZERINDEN|OVER)', text, re.IGNORECASE):
+    elif re.search(r'100\s*\w*zerindendir', text, re.IGNORECASE):
         result["sistem"] = "100"
 
     # Üniversite adı — ilk birkaç satırda bulunur
