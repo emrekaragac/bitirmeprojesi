@@ -436,7 +436,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-700 to-violet-700 text-white px-6 py-4">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-3xl mx-auto">
           <div className="flex items-center justify-between mb-1">
             <a href="/" className="text-indigo-200 hover:text-white text-sm">← Home</a>
             <div className="flex items-center gap-3">
@@ -470,7 +470,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="max-w-3xl mx-auto px-4 py-8">
 
         {/* ── Step 0: Identity ── */}
         {step === 0 && (
