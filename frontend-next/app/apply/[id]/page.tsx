@@ -690,6 +690,9 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               )}
 
               {documents.map(docId => {
+                // Engellilik raporu sadece "has_disability = yes" seçiliyse göster
+                if (docId === "disability_report" && values["has_disability"] !== "yes") return null
+
                 const meta   = DOC_LABELS[docId] || { label: docId, icon: "📄" }
                 const file   = files[docId]
                 const dv     = docValidation[docId]
