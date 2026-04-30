@@ -772,6 +772,80 @@ def _live_search_property(
     return None
 
 
+# ── Endeksa: tapu tipinden kategori ──────────────────────────────────────────
+def _tr_lower(s: str) -> str:
+    """Türkçe özel karakterleri ASCII eşdeğeriyle değiştirip küçük harf yapar."""
+    _TR_MAP = str.maketrans("İIÇĞÖŞÜçğışöü", "iicgosucgisou")
+    return s.translate(_TR_MAP).lower()
+
+
+def _classify_property_category(tapu_turu: str, nitelik: str) -> str:
+    """
+    Tapu tür ve niteliğine göre Endeksa kategori kodu döner.
+    Endeksa URL'leri:
+      konut  → /tr/analiz/turkiye/endeks/satilik/konut
+      arsa   → /tr/analiz/turkiye/endeks/satilik/arsa
+      ticari → /tr/analiz/turkiye/endeks/satilik/ticari
+    """
+    combined = _tr_lower(f"{(tapu_turu or '')} {(nitelik or '')}")
+    if any(k in combined for k in ["arsa", "tarla", "zeytinlik", "orman", "bosta"]):
+        return "arsa"
+    if any(k in combined for k in ["dukkan", "isyeri", "is yeri", "ofis", "depo", "ticari", "buro", "fabrika"]):
+        return "ticari"
+    return "konut"  # daire, mesken, villa, bagımsız bolum, kat irtifakı/mulkiyeti
+
+
+_ENDEKSA_BASE = "https://www.endeksa.com/tr/analiz/turkiye/endeks/satilik"
+
+
+def _endeksa_city_m2(
+    city: str, district: str, category: str, trace: list | None = None
+) -> int | None:
+    """
+    Serper ile Endeksa şehir/ilçe bazlı m² birim fiyatı çeker.
+    Endeksa Angular SPA olduğundan doğrudan çekilemiyor;
+    Google'ın Endeksa snippet'leri üzerinden fiyat alınıyor.
+    Başarısız olursa None döner → üst katman fallback kaynaklara geçer.
+    """
+    cat_tr = {"konut": "konut", "arsa": "arsa", "ticari": "ticari işyeri"}.get(category, category)
+    loc = f"{district} {city}".strip() if district else city
+
+    queries = [
+        f"endeksa {loc} {cat_tr} satılık m2 birim fiyat",
+        f"endeksa {city} {category} ortalama metrekare fiyatı 2025",
+        f"endeksa.com {loc} {category} satılık",
+    ]
+
+    all_text = ""
+    for q in queries:
+        text = _serper_search(q, num=5)
+        if not text:
+            break  # SERPER_API_KEY yok — devam etme
+        all_text += "\n" + text
+        prices = _extract_m2_unit_prices(all_text)
+        log.info(f"Endeksa Serper '{q[:50]}' → m² fiyatlar: {prices[:5]}")
+        if trace is not None:
+            trace.append({"step": "endeksa_serper", "query": q, "unit_prices": prices,
+                          "endeksa_ref": f"{_ENDEKSA_BASE}/{category}"})
+        if len(prices) >= 2:
+            break
+
+    if not all_text:
+        return None
+
+    m2_prices = _extract_m2_unit_prices(all_text)
+    if not m2_prices:
+        log.info(f"Endeksa: {loc} {category} için m² fiyatı bulunamadı")
+        return None
+
+    cleaned = _remove_outliers_iqr(m2_prices)
+    if not cleaned:
+        cleaned = m2_prices
+    median = int(statistics.median(cleaned))
+    log.info(f"Endeksa tier0: {loc} {category} → ₺{median:,}/m²")
+    return median
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 def rag_estimate_car(
     brand: str, model: str, year: int,
@@ -822,16 +896,44 @@ def rag_estimate_car(
 
 def rag_estimate_property(
     city: str, district: str, square_meters: float, ocr_text: str = "",
+    tapu_turu: str = "", nitelik: str = "",
 ) -> dict:
-    # Cache: aynı konum + m² için 30 dk içinde tekrar sorulursa aynı sonucu dön
-    cache_key = f"prop:{(city or '').lower()}:{(district or '').lower()}:{int(square_meters)}"
+    category = _classify_property_category(tapu_turu, nitelik)
+    endeksa_url = f"{_ENDEKSA_BASE}/{category}"
+
+    # Cache: konum + m² + kategori için 30 dk TTL
+    cache_key = f"prop:{(city or '').lower()}:{(district or '').lower()}:{int(square_meters)}:{category}"
     cached = _cache_get(cache_key)
     if cached:
         cached["from_cache"] = True
         return cached
 
     trace: list = []
-    log.info(f"rag_estimate_property: {city} {district} {square_meters}m²")
+    log.info(f"rag_estimate_property: {city} {district} {square_meters}m² category={category}")
+
+    # ── Tier 0: Endeksa şehir/ilçe m² birim fiyatı ───────────────────────────
+    _PROP_MIN, _PROP_MAX = 500_000, 500_000_000
+    endeksa_m2 = _endeksa_city_m2(city, district, category, trace=trace)
+    if endeksa_m2:
+        total = round(endeksa_m2 * square_meters)
+        if _PROP_MIN <= total <= _PROP_MAX:
+            loc = f"{city} {district}".strip() if district else city
+            result = {
+                "rag_used": True,
+                "tier": 0,
+                "property_estimated_value": total,
+                "avg_m2_price": endeksa_m2,
+                "confidence": "high",
+                "price_count": 1,
+                "endeksa_category": category,
+                "reasoning": (
+                    f"{loc} [{category}]: Endeksa ₺{endeksa_m2:,}/m² × {square_meters:.0f}m² = ₺{total:,}."
+                ),
+                "source": f"Endeksa ({endeksa_url})",
+                "debug_trace": trace,
+            }
+            _cache_set(cache_key, result)
+            return result
 
     live = _live_search_property(city, district, square_meters, trace=trace)
     if live:
@@ -845,10 +947,11 @@ def rag_estimate_property(
     ))
     m2 = _CITY_M2.get(city_norm, _CITY_M2["default"])
     val = round(m2 * square_meters)
-    log.info(f"property fallback: city={city} m2p=₺{m2:,} → ₺{val:,}")
+    log.info(f"property fallback: city={city} category={category} m2p=₺{m2:,} → ₺{val:,}")
     trace.append({
         "step": "fallback_formula",
         "city_normalized": city_norm,
+        "category": category,
         "m2_price": m2,
         "square_meters": square_meters,
         "result": val,
@@ -858,7 +961,8 @@ def rag_estimate_property(
         "property_estimated_value": val,
         "avg_m2_price": m2,
         "confidence": "low",
-        "reasoning": f"{city} için ₺{m2:,}/m² × {square_meters}m².",
+        "endeksa_category": category,
+        "reasoning": f"{city} {category} için ₺{m2:,}/m² × {square_meters}m².",
         "source": "şehir bazlı formül",
         "debug_trace": trace,
     }

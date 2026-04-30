@@ -183,6 +183,112 @@ async def debug_document(file: UploadFile = File(...)):
             except: pass
 
 # ─────────────────────────────────────────────────────────────
+# DEBUG — tapu pipeline adım adım testi
+# ─────────────────────────────────────────────────────────────
+
+@app.post("/debug-tapu")
+async def debug_tapu(file: UploadFile = File(...)):
+    """
+    Yüklenen tapu PDF'ini adım adım analiz eder.
+    Her adımda ne çıkarıldığını gösterir — boş alanları teşhis etmek için.
+    """
+    import tempfile
+    tmp_path = None
+    result: dict = {"filename": file.filename, "steps": {}}
+    try:
+        suffix = os.path.splitext(file.filename or "doc")[1] or ".pdf"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
+
+        # 1. Ham metin (OCR katmanı)
+        text = extract_text(tmp_path)
+        result["steps"]["1_ocr_text"] = {
+            "char_count": len(text) if text else 0,
+            "has_text": bool(text and len(text.strip()) > 20),
+            "preview": text[:800] if text else None,
+        }
+
+        # 2. parse_tapu (keyword bazlı alan çıkarma)
+        if text and len(text.strip()) > 20:
+            tapu_parsed = parse_tapu(tmp_path)
+            result["steps"]["2_parse_tapu"] = {
+                "il":        tapu_parsed.get("il"),
+                "ilce":      tapu_parsed.get("ilce"),
+                "mahalle":   tapu_parsed.get("mahalle"),
+                "yuzolcumu": tapu_parsed.get("yuzolcumu"),
+                "nitelik":   tapu_parsed.get("nitelik"),
+                "malik":     tapu_parsed.get("malik"),
+                "ocr_success": tapu_parsed.get("ocr_success"),
+            }
+        else:
+            result["steps"]["2_parse_tapu"] = {"skipped": "OCR metni yetersiz (<20 karakter) — fotoğraf PDF?"}
+
+        # 3. Claude Vision analizi
+        vh = analyze_house(tmp_path)
+        if vh is None:
+            result["steps"]["3_vision"] = {"error": "Vision kullanılamadı (API key yok veya PyMuPDF hatası)"}
+        else:
+            result["steps"]["3_vision"] = {
+                "valid":       vh.get("valid"),
+                "message":     vh.get("message"),
+                "il":          vh.get("il"),
+                "ilce":        vh.get("ilce"),
+                "mahalle":     vh.get("mahalle"),
+                "tapu_turu":   vh.get("tapu_turu"),
+                "nitelik":     vh.get("nitelik"),
+                "yuzolcumu":   vh.get("yuzolcumu"),
+                "arsa_yuzolcumu": vh.get("arsa_yuzolcumu"),
+                "arsa_payi":   vh.get("arsa_payi"),
+                "kat":         vh.get("kat"),
+                "price_per_m2":       vh.get("price_per_m2"),
+                "estimated_value_tl": vh.get("estimated_value_tl"),
+                "confidence":  vh.get("confidence"),
+                "reasoning":   vh.get("reasoning"),
+            }
+
+        # 4. Birleşik sonuç — apply'da ne kullanılır?
+        city_final = ""
+        sqm_final = ""
+        tapu_turu_final = ""
+        nitelik_final = ""
+
+        parsed = result["steps"].get("2_parse_tapu", {})
+        city_final      = parsed.get("il") or ""
+        sqm_final       = str(parsed.get("yuzolcumu") or "")
+        nitelik_final   = parsed.get("nitelik") or ""
+
+        vision = result["steps"].get("3_vision", {})
+        if isinstance(vision, dict) and not vision.get("error"):
+            if not city_final:      city_final      = vision.get("il") or ""
+            if not sqm_final:       sqm_final       = str(vision.get("yuzolcumu") or "")
+            if not tapu_turu_final: tapu_turu_final = vision.get("tapu_turu") or ""
+            if not nitelik_final:   nitelik_final   = vision.get("nitelik") or ""
+
+        from backend.rag_valuation import _classify_property_category
+        category = _classify_property_category(tapu_turu_final, nitelik_final) if (tapu_turu_final or nitelik_final) else "?"
+
+        result["steps"]["4_combined"] = {
+            "city":        city_final or "⚠️ BOŞ — değerleme yapılamaz",
+            "square_meters": sqm_final or "⚠️ BOŞ — değerleme yapılamaz",
+            "tapu_turu":   tapu_turu_final or "⚠️ BOŞ",
+            "nitelik":     nitelik_final or "⚠️ BOŞ",
+            "endeksa_category": category,
+            "valuation_will_run": bool(city_final and sqm_final),
+        }
+
+        return result
+
+    except Exception as exc:
+        import traceback
+        return {"error": str(exc), "traceback": traceback.format_exc()[:1000]}
+    finally:
+        if tmp_path:
+            try: os.remove(tmp_path)
+            except: pass
+
+
+# ─────────────────────────────────────────────────────────────
 # DOCUMENT VALIDATION  — anlık belge doğrulama
 # ─────────────────────────────────────────────────────────────
 
@@ -348,11 +454,12 @@ async def scholarship_apply(
             buf.write(await house_file.read())
         saved_files["house_file"] = house_path
 
+    transcript_path = None
     if transcript_file and transcript_file.filename:
-        p = f"uploads/{transcript_file.filename}"
-        with open(p, "wb") as buf:
+        transcript_path = f"uploads/{transcript_file.filename}"
+        with open(transcript_path, "wb") as buf:
             buf.write(await transcript_file.read())
-        saved_files["transcript_file"] = p
+        saved_files["transcript_file"] = transcript_path
 
     if income_file and income_file.filename:
         p = f"uploads/{income_file.filename}"
@@ -426,25 +533,43 @@ async def scholarship_apply(
     if has_house == "yes" and house_path:
         try:
             text = extract_text(house_path)
+            tapu_turu_val = ""
+            nitelik_val = ""
+            print(f"[TAPU] OCR metin uzunluğu: {len(text) if text else 0} karakter")
             if text and len(text.strip()) > 20:
                 tapu_data = parse_tapu(house_path)
+                print(f"[TAPU] parse_tapu → il={tapu_data.get('il')!r} m²={tapu_data.get('yuzolcumu')!r} nitelik={tapu_data.get('nitelik')!r}")
                 if not city          and tapu_data.get("il"):        city          = tapu_data["il"]
                 if not square_meters and tapu_data.get("yuzolcumu"): square_meters = str(tapu_data["yuzolcumu"])
+                nitelik_val = tapu_data.get("nitelik") or ""
+            else:
+                print("[TAPU] OCR metni yetersiz — fotoğraf PDF, Vision'a geçiliyor")
             ocr_text = tapu_data.get("raw_text", "") if tapu_data else ""
 
-            # Vision: il/ilçe/m² çıkar — fiyat tahmini Vision'dan alınmaz
-            if not (city and square_meters):
+            # Vision: il/ilçe/m²/tapu_turu/nitelik çıkar — fiyat tahmini Vision'dan alınmaz
+            print(f"[TAPU] Vision öncesi: city={city!r} sqm={square_meters!r} tapu_turu={tapu_turu_val!r} nitelik={nitelik_val!r}")
+            if not (city and square_meters and tapu_turu_val and nitelik_val):
                 vh = analyze_house(house_path)
                 if vh:
-                    if not city          and vh.get("il"):        city          = vh["il"]
-                    if not square_meters and vh.get("yuzolcumu"): square_meters = str(vh["yuzolcumu"])
+                    print(f"[TAPU] Vision → valid={vh.get('valid')} il={vh.get('il')!r} m²={vh.get('yuzolcumu')!r} tapu_turu={vh.get('tapu_turu')!r} nitelik={vh.get('nitelik')!r}")
+                    if not city:          city          = vh.get("il") or city
+                    if not square_meters: square_meters = str(vh["yuzolcumu"]) if vh.get("yuzolcumu") else square_meters
+                    if not tapu_turu_val: tapu_turu_val = vh.get("tapu_turu") or ""
+                    if not nitelik_val:   nitelik_val   = vh.get("nitelik")   or ""
+                else:
+                    print("[TAPU] Vision None döndü — API hatası veya key yok")
+            else:
+                print("[TAPU] Vision atlandı — tüm alanlar mevcut")
 
+            print(f"[TAPU] Final: city={city!r} sqm={square_meters!r} tapu_turu={tapu_turu_val!r} nitelik={nitelik_val!r}")
             if city and square_meters:
                 try:
                     val = rag_estimate_property(
                         city=city, district=district,
                         square_meters=float(square_meters),
                         ocr_text=ocr_text,
+                        tapu_turu=tapu_turu_val,
+                        nitelik=nitelik_val,
                     )
                     property_estimated_value = val.get("property_estimated_value")
                     avg_m2_price        = val.get("avg_m2_price")
@@ -467,6 +592,36 @@ async def scholarship_apply(
                     property_debug = {"error": f"rag_estimate_property raised: {str(e)[:200]}"}
         except Exception as e:
             property_debug = {"error": f"property block raised: {str(e)[:200]}"}
+
+    # ── Transkript: GNO/GPA çıkar → form GPA'ını override et ───────────────────
+    transcript_debug = None
+    if transcript_path:
+        try:
+            vt = analyze_house.__module__ and None  # sadece import tetiklemek için
+            from backend.claude_vision import analyze_transcript
+            vt = analyze_transcript(transcript_path)
+            if vt:
+                print(f"[TRANSKRİPT] Vision → valid={vt.get('valid')} gno={vt.get('gno')} sistem={vt.get('sistem')} üniversite={vt.get('universite')!r}")
+                transcript_debug = {
+                    "valid":      vt.get("valid"),
+                    "universite": vt.get("universite"),
+                    "bolum":      vt.get("bolum"),
+                    "sinif":      vt.get("sinif"),
+                    "gno":        vt.get("gno"),
+                    "sistem":     vt.get("sistem"),
+                    "donem_sayisi": vt.get("donem_sayisi"),
+                }
+                # Transkriptten okunan GNO formdakinin önüne geçer
+                if vt.get("valid") and vt.get("gno") is not None:
+                    gpa         = str(vt["gno"])
+                    gpa_system  = vt.get("sistem") or gpa_system
+                if vt.get("valid") and vt.get("sinif") and not grade:
+                    grade = str(vt["sinif"])
+            else:
+                print("[TRANSKRİPT] Vision None döndü")
+        except Exception as e:
+            transcript_debug = {"error": str(e)[:200]}
+            print(f"[TRANSKRİPT] hata: {e}")
 
     # Parse extra fields
     try:
@@ -577,9 +732,11 @@ async def scholarship_apply(
         "estimated_car_value": estimated_car_value,
         "ruhsat_ocr": ruhsat_data,
         "tapu_ocr": tapu_data,
+        "transcript_ocr": transcript_debug,
         "_rag_debug": {
-            "car":      car_debug,
-            "property": property_debug,
+            "car":        car_debug,
+            "property":   property_debug,
+            "transcript": transcript_debug,
         },
         "verification": {
             "tc_valid":       tc_validation.get("valid"),

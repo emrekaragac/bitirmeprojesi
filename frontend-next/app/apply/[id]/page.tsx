@@ -267,6 +267,23 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             visionUnavailable,
           },
         }))
+        // Tapu için Vision'dan çıkarılan il/ilçe/m² bilgilerini otomatik doldur
+        if (key === "house_file" && data.valid) {
+          setValues(prev => ({
+            ...prev,
+            ...(data.il         && !prev.city          ? { city:          data.il }                : {}),
+            ...(data.ilce       && !prev.district       ? { district:      data.ilce }              : {}),
+            ...(data.yuzolcumu  && !prev.square_meters  ? { square_meters: String(data.yuzolcumu) } : {}),
+          }))
+        }
+        // Transkript için Vision'dan çıkarılan GNO/sistem bilgilerini otomatik doldur
+        if (key === "transcript_file" && data.valid && data.gno != null) {
+          setValues(prev => ({
+            ...prev,
+            ...(data.gno    != null && !prev.gpa        ? { gpa:        String(data.gno) }    : {}),
+            ...(data.sistem         && !prev.gpa_system  ? { gpa_system: String(data.sistem) } : {}),
+          }))
+        }
       } else {
         setDocValidation(prev => ({
           ...prev,
@@ -420,11 +437,6 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
           <div className="flex items-center justify-between mb-1">
             <a href="/" className="text-indigo-200 hover:text-white text-sm">← Home</a>
             <div className="flex items-center gap-3">
-              {savedAt && (
-                <span className="text-indigo-300 text-xs flex items-center gap-1">
-                  <span>💾</span> Draft saved {savedAt}
-                </span>
-              )}
               {s.deadline && <span className="text-indigo-200 text-xs">Deadline: {s.deadline}</span>}
             </div>
           </div>
@@ -721,6 +733,28 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                         )
                       )}
                     </div>
+                    {/* Transkript için notlama sistemi seçimi — yüklemeden önce seçin */}
+                    {docId === "transcript_file" && (
+                      <div className="mb-3 space-y-1">
+                        <p className="text-xs font-semibold text-slate-600">Notlama Sistemi (önce seçin):</p>
+                        <div className="flex gap-2">
+                          {GPA_SYSTEM_OPTIONS.map(o => (
+                            <button
+                              key={o.val}
+                              type="button"
+                              onClick={() => setValues(p => ({ ...p, gpa_system: o.val }))}
+                              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border-2 transition ${
+                                values["gpa_system"] === o.val
+                                  ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                  : "border-slate-200 bg-white text-slate-500 hover:border-indigo-300"
+                              }`}
+                            >
+                              {o.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <label className="block cursor-pointer">
                       <div className={`border-2 border-dashed rounded-xl p-3 text-center text-xs transition ${fileCls}`}>
                         {file ? file.name : "PDF seçmek için tıklayın"}
@@ -735,6 +769,14 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                         : status === "invalid" ? "text-red-600"
                         : "text-amber-700"}`}>
                         {dv.message}
+                      </p>
+                    )}
+
+                    {/* Transkript — okunan GNO göster */}
+                    {file && status === "valid" && docId === "transcript_file" && values["gpa"] && (
+                      <p className="mt-2 text-xs font-semibold text-emerald-700">
+                        📊 Okunan GNO: <strong>{values["gpa"]}</strong>
+                        {values["gpa_system"] ? ` (${values["gpa_system"] === "4" ? "4.0 sistemi" : "100'lük sistem"})` : ""}
                       </p>
                     )}
 
@@ -790,9 +832,13 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                       </div>
                     )}
 
-                    {file && status !== "checking" && status !== "invalid" && (dv?.visionUnavailable || status === "unknown") && docId === "house_file" && (
+                    {file && status !== "checking" && status !== "invalid" && docId === "house_file" && (
                       <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
-                        <p className="text-xs font-semibold text-amber-800">Tapu bilgilerini manuel girin:</p>
+                        <p className="text-xs font-semibold text-amber-800">
+                          {(dv?.visionUnavailable || status === "unknown")
+                            ? "Tapu bilgilerini manuel girin:"
+                            : "Tapudan okunan bilgiler (gerekirse düzeltin):"}
+                        </p>
                         <div className="grid grid-cols-2 gap-2">
                           <input
                             className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"

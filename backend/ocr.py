@@ -92,7 +92,7 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
       2. Metin yoksa (fotoğraf PDF) → Claude Vision ile görsel analiz
       3. Vision yanıt vermezse → uyarıyla kabul et (bloke etme)
     """
-    from backend.claude_vision import analyze_car, analyze_house, analyze_generic
+    from backend.claude_vision import analyze_car, analyze_house, analyze_generic, analyze_transcript
 
     sig = DOC_SIGNATURES.get(expected_doc_id)
     if not sig:
@@ -108,8 +108,12 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
         valid = has_anchor and hits >= sig["min_hits"]
 
         if valid:
+            extra: dict = {}
+            if expected_doc_id == "transcript_file":
+                pt = parse_transcript(file_path)
+                extra = {k: pt[k] for k in ("gno", "sistem", "universite", "bolum") if pt.get(k) is not None}
             return {"valid": True, "message": f"✅ Geçerli {sig['name']} tespit edildi.",
-                    "confidence": round(hits / len(sig["keywords"]), 2), "hits": hits}
+                    "confidence": round(hits / len(sig["keywords"]), 2), "hits": hits, **extra}
 
         # Başka belge türü mü?
         best_other = None
@@ -133,6 +137,8 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             result = analyze_car(file_path)
         elif expected_doc_id == "house_file":
             result = analyze_house(file_path)
+        elif expected_doc_id == "transcript_file":
+            result = analyze_transcript(file_path)
         else:
             result = analyze_generic(file_path, expected_doc_id)
 
@@ -151,10 +157,14 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             "hits": 0,
             "vision_used": True,
             "vision_unavailable": False,
-            # Araç/ev için çıkarılan alanlar (apply endpoint'i kullanır)
-            **{k: result[k] for k in ("marka","model","yil","plaka","yakit","hasar",
-                                       "estimated_value_tl","il","ilce","yuzolcumu",
-                                       "price_per_m2","reasoning") if k in result},
+            **{k: result[k] for k in (
+                # Araç
+                "marka","model","yil","plaka","yakit","hasar","estimated_value_tl",
+                # Tapu
+                "il","ilce","yuzolcumu","tapu_turu","nitelik","arsa_payi","kat","price_per_m2","reasoning",
+                # Transkript
+                "universite","bolum","sinif","gno","sistem","donem_sayisi",
+            ) if k in result},
         }
 
     except Exception as e:
@@ -257,6 +267,55 @@ def parse_ruhsat(file_path: str) -> dict:
     )
     if name_match:
         result["sahip_adi"] = name_match.group(1).strip()
+
+    return result
+
+
+def parse_transcript(file_path: str) -> dict:
+    """Transkript PDF'inden GNO ve notlama sistemini çek (text-based PDFs için)."""
+    text = extract_text(file_path)
+    result: dict = {
+        "gno": None,
+        "sistem": None,
+        "universite": None,
+        "bolum": None,
+        "raw_text": text[:2000] if text else "",
+        "ocr_success": bool(text and len(text) > 20),
+    }
+
+    if not text:
+        return result
+
+    # GNO / CGPA
+    gno_match = re.search(
+        r'(?:GNO|GENEL\s+NOT\s+ORTALAMAS[Iİ]|CGPA|GPA|GENEL\s+ORTALAMA)[:\s]*(\d+[.,]\d+)',
+        text, re.IGNORECASE,
+    )
+    if gno_match:
+        try:
+            result["gno"] = float(gno_match.group(1).replace(",", "."))
+        except Exception:
+            pass
+
+    # Notlama sistemi
+    if re.search(r'4[.,]00\s*(?:[ÜU]ZERINDEN|OVER)', text, re.IGNORECASE):
+        result["sistem"] = "4"
+    elif re.search(r'100\s*(?:[ÜU]ZERINDEN|OVER)', text, re.IGNORECASE):
+        result["sistem"] = "100"
+
+    # Üniversite adı — ilk birkaç satırda bulunur
+    for line in text.strip().split('\n')[:8]:
+        if any(kw in line.upper() for kw in ['ÜNİVERSİTE', 'UNIVERSITY', 'UNİVERSİTESİ']):
+            result["universite"] = line.strip()
+            break
+
+    # Bölüm
+    bolum_match = re.search(
+        r'(?:BÖLÜM|BOLUM|PROGRAM|DEPARTMENT)[:\s]+([^\n]{5,60})',
+        text, re.IGNORECASE,
+    )
+    if bolum_match:
+        result["bolum"] = bolum_match.group(1).strip()
 
     return result
 

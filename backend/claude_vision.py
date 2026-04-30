@@ -174,11 +174,24 @@ def analyze_house(file_path: str) -> Optional[dict]:
     prompt = f"""Bu belgeyi incele. Türk tapusu (tapu senedi) olup olmadığını belirle.
 
 ÖNEMLİ ALAN AYRIMI:
-- "Yüz Ölçümü" alanı = ARSA/PARSEL alanı (toplam taşınmaz), daire m² DEĞİL
-- "Kat İrtifakı" belgesinde dairenin gerçek m²'si genellikle tapuda YOK
-- "Arsa Payı" (örn: 5/100) = kişinin arsa üzerindeki hisse oranı
-- "Bağımsız Bölüm" niteliği (MESKEN vb.) = dairenin tipi
-- "Kat" (Bodrum/Zemin/1/2...) = dairenin bulunduğu kat
+- "Yüz Ölçümü" / "Yüzölçümü" = ARSA/PARSEL alanı (toplam taşınmaz), bağımsız bölüm m² DEĞİL
+- Bağımsız bölüm m²'si (daire/dükkan/ofis) çoğunlukla tapuda YAZILMAZ
+- "Arsa Payı" (örn: 10/100) = kişinin tüm arsa üzerindeki hisse oranı
+- "Bağımsız Bölüm" niteliği: Mesken/Dükkan/Ofis/Depo vb.
+- "Kat": Bodrum/Zemin/1/2/3 vb.
+
+ŞEHİR TESPİTİ — ZORUNLU KURALLAR:
+- "İl" alanı BOŞSA veya okunamıyorsa: İlçe, mahalle, sokak, kadastro müdürlüğü adından şehri çıkar
+- Eski tapularda (2010 öncesi) "İlçesi" alanında il adı yazabilir (örn. İlçesi=İSTANBUL → il=İstanbul)
+  Bu durumda gerçek ilçeyi "Mahallesi" veya "Sokağı" alanından bul (örn. Mahalle=Büyükçekmece → ilce=Büyükçekmece)
+- Büyükçekmece, Esenyurt, Beşiktaş, Kadıköy vb. → hepsi İstanbul ilçesidir
+- il asla null döndürme, bağlamdan mutlaka çıkar
+
+NİTELİK TESPİTİ:
+- "Dükkan", "Dükkân", "DÜKKAN" → nitelik="Dükkan"
+- "Mesken", "Konut", "Daire" → nitelik="Mesken"
+- "Büro", "Ofis" → nitelik="Ofis"
+- "Depo", "Ambar" → nitelik="Depo"
 
 {_MARKET}
 
@@ -186,15 +199,15 @@ Sadece JSON döndür, başka metin yazma:
 {{
   "is_tapu": true/false,
   "red_reason": "geçersizse kısa Türkçe neden, yoksa null",
-  "il": "şehir adı veya null",
-  "ilce": "ilçe adı veya null",
+  "il": "şehir adı (bağlamdan çıkar, asla null bırakma)",
+  "ilce": "gerçek ilçe adı veya null",
   "mahalle": "mahalle adı veya null",
   "tapu_turu": "Kat İrtifakı / Kat Mülkiyeti / Müstakil / Arsa / Tarla veya null",
   "arsa_yuzolcumu_m2": TAPU'daki Yüz Ölçümü alanındaki rakam (sayı) veya null,
-  "arsa_payi": "5/100 gibi pay/payda string veya null",
-  "daire_m2": sadece belgede açıkça yazıyorsa daire net m² (sayı), yoksa null,
+  "arsa_payi": "10/100 gibi pay/payda string veya null",
+  "daire_m2": sadece belgede açıkça yazıyorsa bağımsız bölüm net m² (sayı), yoksa null,
   "kat": "Bodrum/Zemin/1/2/3 vb veya null",
-  "nitelik": "Daire/Arsa/Villa/Tarla vb veya null",
+  "nitelik": "Daire/Mesken/Dükkan/Ofis/Depo/Arsa/Villa/Tarla veya null",
   "price_per_m2": tahmini m² fiyatı TL (tam sayı) veya null,
   "estimated_value_tl": tahmini toplam değer TL (tam sayı) veya null,
   "confidence": "low"/"medium"/"high",
@@ -215,29 +228,32 @@ Sadece JSON döndür, başka metin yazma:
     if val and not (500_000 <= int(val) <= 500_000_000):
         val = None
 
-    # ── Gerçek daire m²'sini hesapla ─────────────────────────────────────────
-    # Öncelik: belgedeki açık daire_m2 > arsa payı hesabı > None
+    # ── Bağımsız bölüm m²'sini hesapla ──────────────────────────────────────
+    # Öncelik: belgede açık daire_m2 > arsa payı tahmini > None
     daire_m2 = data.get("daire_m2")
     arsa_m2  = data.get("arsa_yuzolcumu_m2")
-    arsa_payi_str = data.get("arsa_payi")  # "5/100"
+    arsa_payi_str = data.get("arsa_payi")  # "10/100"
     tapu_turu = data.get("tapu_turu", "")
+    nitelik_raw = data.get("nitelik", "") or ""
     kat = data.get("kat", "")
 
+    # Ticari/dükkan tapularda m² nadiren yazılır — arsa payından tahmin et
+    is_ticari = any(k in nitelik_raw.lower() for k in ["dükkan", "dukkan", "ofis", "depo", "büro", "buro"])
+
     if not daire_m2 and arsa_m2 and arsa_payi_str:
-        # Kat irtifakı: arsa payından daire m²'si tahmin et
         try:
             pay, payda = arsa_payi_str.replace(" ", "").split("/")
             oran = int(pay) / int(payda)
-            # Arsa payı × parsel = dairenin tahmini büyüklüğü
-            # Ancak bu genellikle çok küçük çıkar (örn. 5/100 × 239 = 12 m²)
-            # Makul alt sınır 40 m²
             hesap = round(arsa_m2 * oran)
-            daire_m2 = max(hesap, 40) if hesap < 40 else hesap
+            if is_ticari:
+                # Dükkan için makul alt sınır yok — hesabı doğrudan kullan (min 10 m²)
+                daire_m2 = max(hesap, 10)
+            else:
+                # Konut için 40 m² alt sınır (küçük hesaplar genellikle yanlış)
+                daire_m2 = max(hesap, 40) if hesap < 40 else hesap
         except Exception:
             daire_m2 = None
 
-    # Kat İrtifakı'nda yüzölçümü arsa alanıdır — fiyatlamada kullanma
-    # Bodrum kat değer düşüklüğü notu
     bodrum_notu = ""
     if kat and "bodrum" in str(kat).lower():
         bodrum_notu = " (Bodrum kat — değer düşük olabilir)"
@@ -258,6 +274,77 @@ Sadece JSON döndür, başka metin yazma:
         "estimated_value_tl": int(val) if val else None,
         "confidence":   data.get("confidence", "medium"),
         "reasoning":    data.get("reasoning", "") + bodrum_notu,
+    }
+
+
+# ── TRANSKRİPT ───────────────────────────────────────────────────────────────
+def analyze_transcript(file_path: str) -> Optional[dict]:
+    """
+    Transkript PDF'ini Vision ile analiz et.
+    Döner: {valid, universite, bolum, gno, sistem, sinif, message}
+    None → Vision kullanılamadı
+    """
+    images = pdf_to_base64(file_path, max_pages=2)
+    if not images:
+        return None
+
+    prompt = """Bu belgeyi incele. Öğrencinin not dökümü (transkript) olup olmadığını belirle.
+
+TRANSKRİPT TANIMI: Üniversite/yükseköğretim kurumunun resmi not belgesi. Ders listesi, notlar ve genel not ortalaması (GNO/GPA/CGPA) içerir.
+
+NOT ORTALAMASI TESPİTİ — ZORUNLU KURALLAR:
+- "GNO", "Genel Not Ortalaması", "CGPA", "GPA", "Overall GPA", "Kümülatif Ortalama" → genel ortalama
+- 4.00'lık sistemde: 0.00–4.00 arası bir sayı (örn. 3.14, 2.87, 3.50)
+- 100'lük sistemde: 0–100 arası bir sayı (örn. 72.4, 85.0)
+- Eğer her iki sistem de varsa 4.00'lık sistemi tercih et
+- Son yarıyıl/dönem GNO'su değil, GENEL (kümülatif) ortalamayı al
+- Sayfa başlığında veya en alt satırda yazar
+- Ders bazlı notları (AA, BB, 85 gibi) ALMA — sadece genel ortalamayı al
+
+Sadece JSON döndür, başka metin yazma:
+{
+  "is_transcript": true/false,
+  "red_reason": "geçersizse kısa Türkçe neden, yoksa null",
+  "universite": "üniversite adı veya null",
+  "bolum": "bölüm/program adı veya null",
+  "sinif": "1/2/3/4/Yüksek Lisans veya null",
+  "gno": genel not ortalaması sayı olarak (örn. 3.14 veya 78.5) veya null,
+  "sistem": "4" veya "100" (GNO hangi sistemde?) veya null,
+  "donem_sayisi": tamamlanan dönem sayısı (tam sayı) veya null
+}"""
+
+    raw = _call_vision(images, prompt)
+    if not raw:
+        return None
+
+    data = _parse_json(raw)
+    if not data:
+        return None
+
+    is_valid = bool(data.get("is_transcript"))
+    gno = data.get("gno")
+
+    # Makul aralık kontrolü
+    sistem = str(data.get("sistem") or "4")
+    if gno is not None:
+        try:
+            gno = float(gno)
+            if sistem == "4" and not (0.0 <= gno <= 4.0):
+                gno = None
+            elif sistem == "100" and not (0.0 <= gno <= 100.0):
+                gno = None
+        except (TypeError, ValueError):
+            gno = None
+
+    return {
+        "valid":      is_valid,
+        "message":    "✅ Geçerli Transkript." if is_valid else f"❌ {data.get('red_reason', 'Bu belge transkript değil.')}",
+        "universite": data.get("universite"),
+        "bolum":      data.get("bolum"),
+        "sinif":      data.get("sinif"),
+        "gno":        round(gno, 2) if gno is not None else None,
+        "sistem":     sistem if gno is not None else None,
+        "donem_sayisi": data.get("donem_sayisi"),
     }
 
 
