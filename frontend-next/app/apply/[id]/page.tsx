@@ -589,7 +589,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               {questions.map(q => (
                 <div key={q.id}>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    {q.label}{q.required && <span className="text-red-400 ml-1">*</span>}
+                    {q.label}<span className="text-red-400 ml-1">*</span>
                   </label>
 
                   {q.type === "yesno" && (
@@ -675,9 +675,20 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               ))}
             </div>
 
+            {/* Cevaplanmayan sorular uyarısı */}
+            {questions.some(q => !values[q.id]) && (
+              <p className="text-xs text-red-500 font-medium">
+                ❗ Tüm soruları cevaplamanız gerekmektedir.
+              </p>
+            )}
+
             <div className="flex gap-3">
               <button onClick={() => goStep(0)} className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm">← Back</button>
-              <button onClick={() => goStep(2)} className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 text-sm">
+              <button
+                onClick={() => goStep(2)}
+                disabled={questions.some(q => !values[q.id])}
+                className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 Next: Documents →
               </button>
             </div>
