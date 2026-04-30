@@ -39,12 +39,27 @@ function PSSDLogo({ size = 48 }: { size?: number }) {
   )
 }
 
+function deadlineInfo(deadline: string) {
+  const days = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000)
+  if (days < 0)  return { label: "❌ Süresi doldu",          color: "text-red-400",    urgent: false, pulse: false }
+  if (days === 0) return { label: "🔥 Bugün son gün!",        color: "text-red-400",    urgent: true,  pulse: true  }
+  if (days === 1) return { label: "😱 Yarın bitiyor!",        color: "text-red-400",    urgent: true,  pulse: true  }
+  if (days === 2) return { label: "⚡ Son 2 gün!",            color: "text-orange-400", urgent: true,  pulse: false }
+  if (days === 3) return { label: "⏳ Son 3 gün!",            color: "text-orange-400", urgent: true,  pulse: false }
+  if (days <= 7)  return { label: `⏰ ${days} gün kaldı`,     color: "text-amber-400",  urgent: false, pulse: false }
+  const d = new Date(deadline)
+  const fmt = d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })
+  return { label: `📅 ${fmt}`,                               color: "text-slate-400",  urgent: false, pulse: false }
+}
+
 function DeadlineBadge({ deadline }: { deadline: string }) {
   if (!deadline) return null
-  const days = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000)
-  if (days < 0) return <span className="text-xs text-red-500 font-semibold">Closed</span>
-  if (days <= 7) return <span className="text-xs text-orange-500 font-semibold">⏰ {days}d left</span>
-  return <span className="text-xs text-slate-400">{deadline}</span>
+  const { label, color, pulse } = deadlineInfo(deadline)
+  return (
+    <span className={`text-xs font-semibold ${color} ${pulse ? "animate-pulse" : ""}`}>
+      {label}
+    </span>
+  )
 }
 
 export default function LandingPage() {
@@ -169,10 +184,14 @@ export default function LandingPage() {
             {filtered.map(s => {
               const badge = TYPE_BADGE[s.type] || { label: s.type, color: "bg-slate-100 text-slate-600" }
               const isClosed = s.deadline && new Date(s.deadline) < new Date()
+              const dl = s.deadline && !isClosed ? deadlineInfo(s.deadline) : null
               return (
                 <div
                   key={s.id}
-                  className={`bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition cursor-pointer group ${isClosed ? "opacity-60" : ""}`}
+                  className={`backdrop-blur border rounded-2xl p-5 transition cursor-pointer group
+                    ${isClosed ? "opacity-60 bg-white/5 border-white/10" :
+                      dl?.urgent ? "bg-orange-500/5 border-orange-500/30 hover:bg-orange-500/10" :
+                      "bg-white/5 border-white/10 hover:bg-white/10"}`}
                   onClick={() => !isClosed && router.push(`/apply/${s.id}`)}
                 >
                   <div className="flex items-start justify-between gap-3">
