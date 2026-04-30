@@ -42,7 +42,6 @@ DOC_NAMES = {
     "house_file":          "Tapu Senedi",
     "transcript_file":     "Transkript / Not Dökümü",
     "income_file":         "Maaş Bordrosu / Gelir Belgesi",
-    "student_certificate": "Öğrenci Belgesi",
 "disability_report":   "Sağlık Kurulu / Engel Raporu",
 }
 

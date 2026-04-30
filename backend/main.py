@@ -300,7 +300,7 @@ async def validate_doc_endpoint(
     """
     Yüklenen dosyanın beklenen belge türüne uyup uymadığını kontrol eder.
     doc_type: car_file | house_file | transcript_file | income_file |
-              student_certificate | disability_report
+              disability_report
     """
     import tempfile
     suffix = os.path.splitext(file.filename or "doc")[1] or ".pdf"

@@ -155,7 +155,6 @@ const DOC_LABELS: Record<string, { label: string; icon: string }> = {
   house_file:          { label: "Title Deed (Tapu)",             icon: "🏠" },
   transcript_file:     { label: "Transcript",                    icon: "📋" },
   income_file:         { label: "Income Statement",              icon: "💰" },
-  student_certificate: { label: "Student Certificate",           icon: "🎓" },
 disability_report:   { label: "Health/Disability Report",      icon: "❤️" },
 }
 

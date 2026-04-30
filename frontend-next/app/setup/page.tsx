@@ -7,7 +7,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || "https://bitirmeprojesi-gza2.onre
 // ── Types ────────────────────────────────────────────────────
 type DocType =
   | "car_file" | "house_file" | "transcript_file" | "income_file"
-  | "student_certificate" | "disability_report"
+  | "disability_report"
 
 type Question = {
   id: string
@@ -38,7 +38,6 @@ const DOC_OPTIONS: { id: DocType; label: string; icon: string; desc: string }[] 
   { id: "house_file",          label: "Title Deed (Tapu)",             icon: "🏠", desc: "For property valuation via OCR" },
   { id: "transcript_file",     label: "Transcript / GPA",              icon: "📋", desc: "Academic grade report" },
   { id: "income_file",         label: "Income Statement",              icon: "💰", desc: "Family income document" },
-  { id: "student_certificate", label: "Student Certificate",           icon: "🎓", desc: "Proof of enrollment" },
 { id: "disability_report",   label: "Disability/Health Report",      icon: "❤️", desc: "If health criteria applies" },
 ]
 

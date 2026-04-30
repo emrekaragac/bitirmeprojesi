@@ -52,16 +52,6 @@ DOC_SIGNATURES: dict = {
         ],
         "min_hits": 3,
     },
-    "student_certificate": {
-        "name": "Öğrenci Belgesi",
-        "required_any": ["ÖĞRENCİ BELGESİ", "ÖĞRENCİ NUMARASI", "AKTİF ÖĞRENCİ", "ÖĞRENCİ İŞLERİ", "ÖĞRENCININ"],
-        "keywords": [
-            "ÖĞRENCİ BELGESİ", "ÖĞRENCİ", "KAYITLI", "ÜNİVERSİTE",
-            "BÖLÜM", "SINIF", "ÖĞRENCİ NUMARASI", "FAKÜLTE",
-            "AKTİF ÖĞRENCİ", "ÖĞRENCİ İŞLERİ",
-        ],
-        "min_hits": 3,
-    },
     "disability_report": {
         "name": "Sağlık / Engel Raporu",
         "required_any": ["SAĞLIK KURULU", "ENGELLİLİK", "HEYET RAPORU", "ENGELLİLİK ORANI", "SAĞLIK KURULU RAPORU"],
