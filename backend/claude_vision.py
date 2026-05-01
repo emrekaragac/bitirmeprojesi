@@ -256,6 +256,9 @@ Sadece JSON döndür, başka metin yazma:
     if kat and "bodrum" in str(kat).lower():
         bodrum_notu = " (Bodrum kat — değer düşük olabilir)"
 
+    from backend.rag_valuation import _classify_property_category
+    property_category = _classify_property_category(tapu_turu or "", nitelik_raw or "")
+
     return {
         "valid": is_valid,
         "message": "✅ Geçerli Tapu Senedi." if is_valid else f"❌ {data.get('red_reason', 'Bu belge tapu senedi değil.')}",
@@ -268,6 +271,7 @@ Sadece JSON döndür, başka metin yazma:
         "tapu_turu":    tapu_turu,
         "kat":          kat,
         "nitelik":      data.get("nitelik"),
+        "property_category": property_category,
         "price_per_m2":       int(m2p) if m2p else None,
         "estimated_value_tl": int(val) if val else None,
         "confidence":   data.get("confidence", "medium"),

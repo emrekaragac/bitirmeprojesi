@@ -105,6 +105,14 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             elif expected_doc_id == "income_file":
                 pi = parse_income(file_path)
                 extra = {k: pi[k] for k in ("net_aylik", "income_bracket", "kaynak") if pi.get(k) is not None}
+            elif expected_doc_id == "house_file":
+                from backend.rag_valuation import _classify_property_category
+                pt2 = parse_tapu(file_path)
+                tapu_keys = ("il", "ilce", "mahalle", "yuzolcumu", "nitelik", "malik")
+                extra = {k: pt2[k] for k in tapu_keys if pt2.get(k) is not None}
+                extra["property_category"] = _classify_property_category(
+                    pt2.get("tapu_turu") or "", pt2.get("nitelik") or ""
+                )
             return {"valid": True, "message": f"✅ Geçerli {sig['name']} tespit edildi.",
                     "confidence": round(hits / len(sig["keywords"]), 2), "hits": hits, **extra}
 
@@ -156,7 +164,7 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
                 # Araç
                 "marka","model","yil","plaka","yakit","hasar","estimated_value_tl",
                 # Tapu
-                "il","ilce","yuzolcumu","tapu_turu","nitelik","arsa_payi","kat","price_per_m2","reasoning",
+                "il","ilce","mahalle","yuzolcumu","tapu_turu","nitelik","property_category","arsa_payi","kat","price_per_m2","reasoning",
                 # Transkript
                 "universite","bolum","sinif","gno","sistem","donem_sayisi","ogrenci_adi",
                 # Gelir
@@ -412,26 +420,89 @@ def parse_tapu(file_path: str) -> dict:
     if not text:
         return result
 
-    text_upper = text.upper()
-
-    # İl / Şehir
-    provinces = [
-        "İSTANBUL", "ISTANBUL", "ANKARA", "İZMİR", "IZMIR", "BURSA",
-        "ANTALYA", "ADANA", "KONYA", "GAZİANTEP", "GAZIANTEP",
-        "KAYSERİ", "KAYSERI", "MERSİN", "MERSIN", "ESKİŞEHİR", "ESKISEHIR",
-        "DİYARBAKIR", "DIYARBAKIR", "SAMSUN", "TRABZON", "MALATYA",
-        "GEBZe", "KOCAELI", "KOCAELİ",
+    # Tüm 81 il — uzun isimler önce (kısmi eşleşmeyi önler)
+    _PROVINCES = [
+        ("AFYONKARAHISAR", "Afyonkarahisar"), ("KAHRAMANMARAŞ", "Kahramanmaraş"),
+        ("KAHRAMAN MARAS", "Kahramanmaraş"), ("DİYARBAKIR", "Diyarbakır"),
+        ("DIYARBAKIR", "Diyarbakır"), ("ESKİŞEHİR", "Eskişehir"),
+        ("ESKISEHIR", "Eskişehir"), ("GAZİANTEP", "Gaziantep"),
+        ("GAZIANTEP", "Gaziantep"), ("KAYSERİ", "Kayseri"), ("KAYSERI", "Kayseri"),
+        ("KOCAELİ", "Kocaeli"), ("KOCAELI", "Kocaeli"), ("SAKARYA", "Sakarya"),
+        ("İSTANBUL", "İstanbul"), ("ISTANBUL", "İstanbul"),
+        ("İZMİR", "İzmir"), ("IZMIR", "İzmir"), ("ANKARA", "Ankara"),
+        ("BURSA", "Bursa"), ("ANTALYA", "Antalya"), ("ADANA", "Adana"),
+        ("KONYA", "Konya"), ("MERSİN", "Mersin"), ("MERSIN", "Mersin"),
+        ("SAMSUN", "Samsun"), ("TRABZON", "Trabzon"), ("MALATYA", "Malatya"),
+        ("BALIKESIR", "Balıkesir"), ("BALIKESİR", "Balıkesir"),
+        ("MANISA", "Manisa"), ("MANİSA", "Manisa"),
+        ("DENIZLI", "Denizli"), ("DENİZLİ", "Denizli"),
+        ("HATAY", "Hatay"), ("MUĞLA", "Muğla"), ("MUGLA", "Muğla"),
+        ("TEKIRDAĞ", "Tekirdağ"), ("TEKIRDAG", "Tekirdağ"),
+        ("KÜTAHYA", "Kütahya"), ("KUTAHYA", "Kütahya"),
+        ("GEBZE", "Kocaeli"),  # Gebze → Kocaeli
+        ("ORDU", "Ordu"), ("ERZURUM", "Erzurum"), ("VAN", "Van"),
+        ("ŞANLIURFA", "Şanlıurfa"), ("SANLIURFA", "Şanlıurfa"),
+        ("ŞIRNAK", "Şırnak"), ("MARDIN", "Mardin"), ("BATMAN", "Batman"),
+        ("SIIRT", "Siirt"), ("AĞRI", "Ağrı"), ("AGRI", "Ağrı"),
+        ("ARDAHAN", "Ardahan"), ("IĞDIR", "Iğdır"), ("IGDIR", "Iğdır"),
+        ("TUNCELI", "Tunceli"), ("BİNGÖL", "Bingöl"), ("BINGOL", "Bingöl"),
+        ("MUŞ", "Muş"), ("MUS", "Muş"), ("BITLIS", "Bitlis"),
+        ("HAKKARI", "Hakkari"), ("ELAZIĞ", "Elazığ"), ("ELAZIG", "Elazığ"),
+        ("ADIYAMAN", "Adıyaman"), ("GAZIOSMANPASA", "İstanbul"),
+        ("ÇANAKKALE", "Çanakkale"), ("CANAKKALE", "Çanakkale"),
+        ("EDİRNE", "Edirne"), ("EDIRNE", "Edirne"),
+        ("KIRKLARELİ", "Kırklareli"), ("KIRKLARELI", "Kırklareli"),
+        ("ÇORLU", "Tekirdağ"), ("CORLU", "Tekirdağ"),
+        ("ISPARTA", "Isparta"), ("BURDUR", "Burdur"),
+        ("AFYON", "Afyonkarahisar"), ("KARS", "Kars"),
+        ("KASTAMONU", "Kastamonu"), ("ÇORUM", "Çorum"), ("CORUM", "Çorum"),
+        ("AMASYA", "Amasya"), ("TOKAT", "Tokat"), ("SİVAS", "Sivas"), ("SIVAS", "Sivas"),
+        ("GİRESUN", "Giresun"), ("GIRESUN", "Giresun"),
+        ("RIZE", "Rize"), ("ARTVİN", "Artvin"), ("ARTVIN", "Artvin"),
+        ("GÜMÜŞHANE", "Gümüşhane"), ("BAYBURT", "Bayburt"),
+        ("ERZINCAN", "Erzincan"), ("ERZİNCAN", "Erzincan"),
+        ("NEVSEHIR", "Nevşehir"), ("NEVŞEHİR", "Nevşehir"),
+        ("AKSARAY", "Aksaray"), ("KIRIKKALE", "Kırıkkale"),
+        ("YOZGAT", "Yozgat"), ("CANKIRI", "Çankırı"), ("ÇANKIRI", "Çankırı"),
+        ("BOLU", "Bolu"), ("DÜZCE", "Düzce"), ("DUZCE", "Düzce"),
+        ("ZONGULDAK", "Zonguldak"), ("KARABÜK", "Karabük"), ("KARABUK", "Karabük"),
+        ("BARTIN", "Bartın"), ("SINOP", "Sinop"), ("ANKARA", "Ankara"),
+        ("NIGDE", "Niğde"), ("NİĞDE", "Niğde"),
+        ("KARAMAN", "Karaman"), ("OSMANIYE", "Osmaniye"),
+        ("KILIS", "Kilis"), ("GAZIANTEP", "Gaziantep"),
+        ("AYDIN", "Aydın"), ("AYDIN", "Aydın"),
+        ("USAK", "Uşak"), ("UŞAK", "Uşak"),
+        ("BILECIK", "Bilecik"), ("BİLECİK", "Bilecik"),
+        ("BOLU", "Bolu"), ("YALOVA", "Yalova"),
+        ("KIRŞEHIR", "Kırşehir"), ("KIRŞEHİR", "Kırşehir"),
+        ("ÇANKIRI", "Çankırı"),
     ]
-    for province in provinces:
-        norm = province.upper()
-        if norm in text_upper:
-            display = province.replace("İ", "İ").title()
+
+    text_upper = text.upper()
+    for keyword, display in _PROVINCES:
+        if keyword in text_upper:
             result["il"] = display
             break
 
+    # İlçe — "İlçe:" etiketinden sonra gelen kelime
+    ilce_match = re.search(
+        r'(?:İLÇE|ILCE|İLÇESİ)[:\s]+([A-ZÇĞİÖŞÜa-zçğışöüÇĞİÖŞÜ ]{3,30})',
+        text, re.IGNORECASE
+    )
+    if ilce_match:
+        result["ilce"] = ilce_match.group(1).strip().split('\n')[0].strip()
+
+    # Mahalle / Bölge
+    mahalle_match = re.search(
+        r'(?:MAHALLE|MAHALLESİ)[:\s]+([A-ZÇĞİÖŞÜa-zçğışöüÇĞİÖŞÜ ]{3,40})',
+        text, re.IGNORECASE
+    )
+    if mahalle_match:
+        result["mahalle"] = mahalle_match.group(1).strip().split('\n')[0].strip()
+
     # Yüzölçümü / alan m²
     area_patterns = [
-        r'(?:YÜZÖLÇÜMü|YÜZÖLÇÜMÜ|ALAN)[:\s]*(\d+[.,]\d+)\s*(?:m[²2])?',
+        r'(?:YÜZ\s*ÖLÇÜMÜ|YÜZÖLÇÜMÜ|YÜZÖLÇÜMü|ALAN)[:\s]*(\d+[.,]\d+)\s*(?:m[²2])?',
         r'(\d+[.,]\d+)\s*m[²2]',
         r'(\d{2,5}[.,]\d{2})\s*m',
     ]
@@ -445,17 +516,28 @@ def parse_tapu(file_path: str) -> dict:
             except Exception:
                 pass
 
-    # Nitelik (property type)
-    if any(k in text_upper for k in ["DAİRE", "DAIRE", "APARTMAN"]):
-        result["nitelik"] = "Daire"
-    elif "ARSA" in text_upper:
-        result["nitelik"] = "Arsa"
-    elif "TARLA" in text_upper:
-        result["nitelik"] = "Tarla"
-    elif any(k in text_upper for k in ["BAĞIMSIZ BÖLÜM", "BAGIMSIZ BOLUM"]):
-        result["nitelik"] = "Bağımsız Bölüm"
-    elif "VİLLA" in text_upper or "VILLA" in text_upper:
-        result["nitelik"] = "Villa"
+    # Nitelik (property type) — ticari tipler önce (daha spesifik)
+    nitelik_map = [
+        (["DÜKKAN", "DUKKAN", "DÜKKÂN"],             "Dükkan"),
+        (["İŞYERİ", "ISYERI", "IS YERI"],            "İşyeri"),
+        (["OFİS", "OFIS"],                            "Ofis"),
+        (["MAĞAZA", "MAGAZA"],                        "Mağaza"),
+        (["FABRİKA", "FABRIKA"],                      "Fabrika"),
+        (["DEPO", "AMBAR"],                           "Depo"),
+        (["ATÖLYE", "ATOLYE"],                        "Atölye"),
+        (["TARLA"],                                   "Tarla"),
+        (["ARSA"],                                    "Arsa"),
+        (["BAHÇE", "BAHCE"],                          "Bahçe"),
+        (["ZEYTİNLİK", "ZEYTINLIK"],                  "Zeytinlik"),
+        (["VİLLA", "VILLA", "MÜSTAKIL", "MUSTAKIL"],  "Villa"),
+        (["BAĞIMSIZ BÖLÜM", "BAGIMSIZ BOLUM"],        "Bağımsız Bölüm"),
+        (["DAİRE", "DAIRE", "MESKEN", "APARTMAN"],    "Daire"),
+        (["KONUT"],                                   "Konut"),
+    ]
+    for keywords, label in nitelik_map:
+        if any(k in text_upper for k in keywords):
+            result["nitelik"] = label
+            break
 
     # Malik (sahip)
     malik_match = re.search(
