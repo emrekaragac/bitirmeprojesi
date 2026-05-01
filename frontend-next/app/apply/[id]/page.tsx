@@ -317,6 +317,10 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
         "city","district","square_meters"].forEach(k => {
         fd.append(k, values[k] || "")
       })
+      // financial/academic fields — always send even if not a scholarship question
+      ;["monthly_income","gpa","gpa_system","family_size"].forEach(k => {
+        fd.append(k, values[k] || "")
+      })
       // scholarship questions — hem doğrudan ekle (eski alanlar için)
       // hem de extra_fields JSON olarak gönder (yeni/custom sorular backend'e ulaşsın)
       const extraFields: Record<string, string> = {}
