@@ -101,7 +101,7 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             extra: dict = {}
             if expected_doc_id == "transcript_file":
                 pt = parse_transcript(file_path)
-                extra = {k: pt[k] for k in ("gno", "sistem", "universite", "bolum") if pt.get(k) is not None}
+                extra = {k: pt[k] for k in ("gno", "sistem", "universite", "bolum", "ogrenci_adi") if pt.get(k) is not None}
             elif expected_doc_id == "income_file":
                 pi = parse_income(file_path)
                 extra = {k: pi[k] for k in ("net_aylik", "income_bracket", "kaynak") if pi.get(k) is not None}
@@ -158,7 +158,7 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
                 # Tapu
                 "il","ilce","yuzolcumu","tapu_turu","nitelik","arsa_payi","kat","price_per_m2","reasoning",
                 # Transkript
-                "universite","bolum","sinif","gno","sistem","donem_sayisi",
+                "universite","bolum","sinif","gno","sistem","donem_sayisi","ogrenci_adi",
                 # Gelir
                 "net_aylik","income_bracket","kaynak",
             ) if k in result},
@@ -318,6 +318,21 @@ def parse_transcript(file_path: str) -> dict:
     )
     if bolum_match:
         result["bolum"] = bolum_match.group(1).strip()
+
+    # Öğrenci adı — birden fazla etiket formatını dene
+    name_patterns = [
+        r'(?:ÖĞRENCİN[İI]N\s+)?ADI?\s+SOYADI?[:\s]+([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
+        r'(?:STUDENT\s+)?NAME[:\s]+([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
+        r'ÖĞRENCİ[:\s]+([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
+        r'AD\s+SOYAD[:\s]+([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
+    ]
+    for pat in name_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            candidate = m.group(1).strip().split('\n')[0].strip()
+            if 3 < len(candidate) < 60:
+                result["ogrenci_adi"] = candidate
+                break
 
     return result
 

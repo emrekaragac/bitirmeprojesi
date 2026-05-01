@@ -296,11 +296,14 @@ async def debug_tapu(file: UploadFile = File(...)):
 async def validate_doc_endpoint(
     doc_type: str,
     file: UploadFile = File(...),
+    first_name: str = Form(""),
+    last_name:  str = Form(""),
 ):
     """
     Yüklenen dosyanın beklenen belge türüne uyup uymadığını kontrol eder.
     doc_type: car_file | house_file | transcript_file | income_file |
               disability_report
+    Transkript için first_name/last_name gönderilirse isim eşleşmesi kontrol edilir.
     """
     import tempfile
     suffix = os.path.splitext(file.filename or "doc")[1] or ".pdf"
@@ -311,7 +314,6 @@ async def validate_doc_endpoint(
             tmp_path = tmp.name
         result = validate_document(tmp_path, doc_type)
     except Exception as exc:
-        # Backend hatası → bloke ETME, uyarıyla kabul et
         result = {
             "valid": True,
             "expected_name": doc_type,
@@ -326,6 +328,27 @@ async def validate_doc_endpoint(
                 os.remove(tmp_path)
             except Exception:
                 pass
+
+    # Transkript için isim karşılaştırması
+    if doc_type == "transcript_file" and result.get("valid"):
+        ogrenci_adi = result.get("ogrenci_adi") or ""
+        if ogrenci_adi and (first_name or last_name):
+            def _norm(s: str) -> str:
+                return (s.upper()
+                        .replace("İ", "I").replace("Ğ", "G")
+                        .replace("Ü", "U").replace("Ş", "S")
+                        .replace("Ö", "O").replace("Ç", "C"))
+            norm_doc  = _norm(ogrenci_adi)
+            norm_fn   = _norm(first_name.strip())
+            norm_ln   = _norm(last_name.strip())
+            fn_ok = not norm_fn or norm_fn in norm_doc
+            ln_ok = not norm_ln or norm_ln in norm_doc
+            result["name_match"]    = fn_ok and ln_ok
+            result["name_checked"]  = True
+        else:
+            result["name_match"]   = None   # kontrol yapılamadı
+            result["name_checked"] = False
+
     return result
 
 

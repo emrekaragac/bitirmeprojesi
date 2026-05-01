@@ -308,7 +308,8 @@ Sadece JSON döndür, başka metin yazma:
   "sinif": "1/2/3/4/Yüksek Lisans veya null",
   "gno": genel not ortalaması sayı olarak (örn. 3.14 veya 78.5) veya null,
   "sistem": "4" veya "100" (GNO hangi sistemde?) veya null,
-  "donem_sayisi": tamamlanan dönem sayısı (tam sayı) veya null
+  "donem_sayisi": tamamlanan dönem sayısı (tam sayı) veya null,
+  "ogrenci_adi": "belgede yazan öğrenci adı soyadı (tam olarak) veya null"
 }"""
 
     raw = _call_vision(images, prompt)
@@ -343,6 +344,7 @@ Sadece JSON döndür, başka metin yazma:
         "gno":        round(gno, 2) if gno is not None else None,
         "sistem":     sistem if gno is not None else None,
         "donem_sayisi": data.get("donem_sayisi"),
+        "ogrenci_adi": data.get("ogrenci_adi"),
     }
 
 

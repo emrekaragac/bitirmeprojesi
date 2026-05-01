@@ -193,6 +193,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
     message: string
     visionUnavailable?: boolean
     netAylik?: number
+    nameMismatch?: boolean
+    transcriptName?: string
   }>>({})
 
 
@@ -253,6 +255,11 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
     try {
       const fd = new FormData()
       fd.append("file", f)
+      // Transkript için isim eşleşme kontrolü
+      if (key === "transcript_file") {
+        fd.append("first_name", values.first_name || "")
+        fd.append("last_name",  values.last_name  || "")
+      }
       const res = await fetch(`${API}/validate-document/${key}`, { method: "POST", body: fd })
       if (res.ok) {
         const data = await res.json()
@@ -282,6 +289,17 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             ...prev,
             gpa: String(data.gno),
             ...(data.sistem ? { gpa_system: String(data.sistem) } : {}),
+          }))
+        }
+        // İsim uyumsuzluğunu state'e kaydet
+        if (key === "transcript_file" && data.name_checked) {
+          setDocValidation(prev => ({
+            ...prev,
+            [key]: {
+              ...prev[key],
+              nameMismatch:    data.name_match === false,
+              transcriptName:  data.ogrenci_adi ?? undefined,
+            },
           }))
         }
         if (key === "income_file" && data.valid && data.income_bracket) {
@@ -874,6 +892,24 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                       </p>
                     )}
 
+                    {/* Transkript — isim uyumsuzluğu uyarısı */}
+                    {file && docId === "transcript_file" && docValidation[docId]?.nameMismatch === true && (
+                      <div className="mt-2 bg-red-50 border border-red-200 rounded-xl p-3">
+                        <p className="text-xs font-bold text-red-700 mb-0.5">
+                          ⚠️ İsim Uyuşmazlığı
+                        </p>
+                        <p className="text-xs text-red-600 leading-snug">
+                          Transkriptteki isim (<strong>{docValidation[docId].transcriptName}</strong>) formda girdiğiniz isimle eşleşmiyor.
+                          Lütfen size ait bir transkript yükleyin.
+                        </p>
+                      </div>
+                    )}
+                    {file && docId === "transcript_file" && docValidation[docId]?.nameMismatch === false && docValidation[docId]?.transcriptName && (
+                      <p className="mt-1.5 text-xs text-emerald-700 font-medium">
+                        ✅ Transkript sahibi doğrulandı: <strong>{docValidation[docId].transcriptName}</strong>
+                      </p>
+                    )}
+
                     {/* Manuel giriş — Vision okuyamadığında veya servis erişilemediğinde */}
                     {file && status !== "checking" && status !== "invalid" && (dv?.visionUnavailable || status === "unknown") && docId === "car_file" && (
                       <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
@@ -990,7 +1026,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                 disabled={
                   loading ||
                   Object.values(docValidation).some(v => v.status === "checking") ||
-                  Object.values(docValidation).some(v => v.status === "invalid")
+                  Object.values(docValidation).some(v => v.status === "invalid") ||
+                  Object.values(docValidation).some(v => v.nameMismatch === true)
                 }
                 className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -1001,6 +1038,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                   </span>
                 ) : Object.values(docValidation).some(v => v.status === "checking")
                   ? "Belgeler kontrol ediliyor…"
+                  : Object.values(docValidation).some(v => v.nameMismatch === true)
+                  ? "İsim uyuşmazlığı — başvuru gönderilemez"
                   : "Başvuruyu Gönder →"}
               </button>
             </div>
