@@ -534,23 +534,26 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                 </div>
               ))}
 
-              {/* Email — @ kontrolü */}
+              {/* Email — format kontrolü */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">E-posta *</label>
                 <input
                   type="email"
                   value={values["email"] || ""}
                   onChange={e => setVal("email", e.target.value)}
-                  placeholder="ornek@mail.com"
+                  placeholder="ornek@gmail.com"
                   className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400
                     ${values["email"]
-                      ? values["email"].includes("@")
+                      ? /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(values["email"])
                         ? "text-slate-900 font-bold border-emerald-400"
                         : "text-slate-900 font-bold border-red-300"
                       : "text-slate-400 border-slate-200"}`}
                 />
                 {values["email"] && !values["email"].includes("@") && (
-                  <p className="text-xs text-red-500 font-medium mt-1">❌ Geçerli bir e-posta adresi girin (@)</p>
+                  <p className="text-xs text-red-500 font-medium mt-1">❌ @ işareti zorunlu (örn: ornek@gmail.com)</p>
+                )}
+                {values["email"] && values["email"].includes("@") && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(values["email"]) && (
+                  <p className="text-xs text-red-500 font-medium mt-1">❌ Geçerli domain girin (örn: @gmail.com)</p>
                 )}
               </div>
 
@@ -633,7 +636,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               disabled={
                 !values.first_name || !values.last_name || !kvkkAccepted ||
                 (!!values["tc_no"] && values["tc_no"].length !== 11) ||
-                (!!values["email"] && !values["email"].includes("@"))
+                (!!values["email"] && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(values["email"]))
               }
               className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
