@@ -798,194 +798,295 @@ def _classify_property_category(tapu_turu: str, nitelik: str) -> str:
 
 _ENDEKSA_BASE = "https://www.endeksa.com/tr/analiz/turkiye/endeks/satilik"
 
-_ENDEKSA_TABLE_URLS = {
-    "konut":  f"{_ENDEKSA_BASE}/konut",
-    "arsa":   f"{_ENDEKSA_BASE}/arsa",
-    "ticari": f"{_ENDEKSA_BASE}/ticari",
+# İl URL slug'ları — Endeksa URL yapısı: /tr/analiz/{slug}/endeks/satilik/{category}
+_CITY_SLUGS: dict[str, str] = {
+    "istanbul": "istanbul", "izmir": "izmir", "ankara": "ankara",
+    "bursa": "bursa", "antalya": "antalya", "adana": "adana",
+    "konya": "konya", "gaziantep": "gaziantep", "kayseri": "kayseri",
+    "mersin": "mersin", "eskisehir": "eskisehir", "diyarbakir": "diyarbakir",
+    "samsun": "samsun", "trabzon": "trabzon", "malatya": "malatya",
+    "kocaeli": "kocaeli", "sakarya": "sakarya", "tekirdag": "tekirdag",
+    "balikesir": "balikesir", "manisa": "manisa", "denizli": "denizli",
+    "hatay": "hatay", "mugla": "mugla", "aydin": "aydin",
+    "kirikkale": "kirikkale", "van": "van", "sanliurfa": "sanliurfa",
+    "kahramanmaras": "kahramanmaras", "erzurum": "erzurum",
+    "ordu": "ordu", "afyonkarahisar": "afyonkarahisar", "kutahya": "kutahya",
+    "isparta": "isparta", "burdur": "burdur", "usak": "usak",
+    "zonguldak": "zonguldak", "bolu": "bolu", "duzce": "duzce",
+    "yalova": "yalova", "karabuk": "karabuk", "bartin": "bartin",
+    "kastamonu": "kastamonu", "corum": "corum", "amasya": "amasya",
+    "tokat": "tokat", "sivas": "sivas", "giresun": "giresun",
+    "rize": "rize", "artvin": "artvin", "erzincan": "erzincan",
+    "nevsehir": "nevsehir", "aksaray": "aksaray", "nigde": "nigde",
+    "yozgat": "yozgat", "karaman": "karaman", "osmaniye": "osmaniye",
+    "adiyaman": "adiyaman", "kilis": "kilis", "sinop": "sinop",
+    "canakkale": "canakkale", "edirne": "edirne", "kirklareli": "kirklareli",
+    "bilecik": "bilecik", "elazig": "elazig", "bingol": "bingol",
+    "mus": "mus", "bitlis": "bitlis", "hakkari": "hakkari",
+    "siirt": "siirt", "sirnak": "sirnak", "mardin": "mardin",
+    "batman": "batman", "agri": "agri", "igdir": "igdir",
+    "ardahan": "ardahan", "kars": "kars", "tunceli": "tunceli",
 }
-_ENDEKSA_TABLE_TITLES = {
+
+_IL_TABLE_TITLES = {
     "konut":  "Türkiye Satılık Konut Fiyatları",
     "arsa":   "Türkiye Konut İmarlı Arsa Fiyatları",
     "ticari": "Türkiye Satılık Ticari Gayrimenkul Fiyatları",
 }
+_ILCE_TABLE_TITLES = {
+    "konut":  "İlçeleri Satılık Konut Fiyatları",
+    "arsa":   "İlçeleri Konut İmarlı Arsa Fiyatları",
+    "ticari": "İlçeleri Satılık Ticari Gayrimenkul Fiyatları",
+}
+
 _ENDEKSA_TABLE_CACHE: dict[str, tuple[dict, float]] = {}
-_ENDEKSA_TABLE_TTL = 6 * 3600  # Aylık veri — 6 saat yeterli
+_ENDEKSA_TABLE_TTL = 6 * 3600  # Aylık veri — 6 saat cache
 
 
-def _fetch_endeksa_table(category: str, trace: list | None = None) -> dict[str, int]:
-    """
-    Endeksa.com il bazlı m² fiyat tablosunu Claude web_search ile okur.
-    Sonuç cache'lenir (6 saat TTL) — tablo aylık güncellenir.
-    Returns: {il_normalized: tl_per_m2}  örn. {"istanbul": 125000, "ankara": 55000}
-    """
-    cache_key = f"endeksa_table:{category}"
-    if cache_key in _ENDEKSA_TABLE_CACHE:
-        table, ts = _ENDEKSA_TABLE_CACHE[cache_key]
-        if time.time() - ts < _ENDEKSA_TABLE_TTL:
-            log.info(f"Endeksa table cache hit: {category} ({len(table)} il)")
-            return table
-
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        log.warning("ANTHROPIC_API_KEY yok — Endeksa table fetch atlandı")
-        return {}
-
-    url   = _ENDEKSA_TABLE_URLS.get(category, _ENDEKSA_TABLE_URLS["konut"])
-    title = _ENDEKSA_TABLE_TITLES.get(category, "")
-
-    prompt = (
-        f"Lütfen şu sayfaya git: {url}\n\n"
-        f"Sayfadaki '{title}' başlıklı tabloda her satır bir Türkiye ili, "
-        f"her sütun bir ay (en sağdaki Nisan 2026 veya en güncel ay). "
-        f"Her ilin Nisan 2026 sütunundaki m² birim satış fiyatını oku (TL/m²).\n\n"
-        f"SADECE şu JSON formatında yanıt ver, başka hiçbir şey yazma:\n"
-        f'{{"table": {{"istanbul": 125000, "ankara": 55000, "izmir": 72000, ...}}}}\n\n'
-        f"İl adlarını Türkçe özel karaktersiz küçük harfle yaz "
-        f"(örn. istanbul, izmir, eskisehir, gaziantep). "
-        f"Mümkün olduğunca çok ili ekle (81 il hedef). "
-        f"Fiyatları tam sayı TL/m² olarak ver."
-    )
-
+def _endeksa_web_search(client, prompt: str, trace: list | None = None) -> str:
+    """Claude web_search tool ile endeksa.com sayfasından veri çeker."""
     tool = {
         "type": "web_search_20250305",
         "name": "web_search",
         "max_uses": 4,
         "allowed_domains": ["endeksa.com"],
         "user_location": {
-            "type": "approximate",
-            "country": "TR",
-            "city": "Istanbul",
-            "timezone": "Europe/Istanbul",
+            "type": "approximate", "country": "TR",
+            "city": "Istanbul", "timezone": "Europe/Istanbul",
         },
     }
+    full_text = ""
+    messages = [{"role": "user", "content": prompt}]
+    for turn in range(5):
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=4000,
+            tools=[tool],
+            messages=messages,
+        )
+        for block in resp.content:
+            if hasattr(block, "text") and block.text:
+                full_text += block.text
+        log.info(f"Endeksa WS turn {turn+1}: stop={resp.stop_reason} chars={len(full_text)}")
+        if resp.stop_reason == "pause_turn":
+            messages.append({"role": "assistant", "content": resp.content})
+            continue
+        break
+    if trace is not None:
+        trace.append({"step": "endeksa_web_search", "chars": len(full_text), "preview": full_text[:400]})
+    return full_text
+
+
+def _parse_endeksa_json(text: str, min_entries: int = 3) -> dict[str, int]:
+    """JSON tablosunu metinden çıkar → {norm_key: price} dict."""
+    for pat in [
+        r'\{[^{}]*?"table"\s*:\s*(\{[^{}]+\})',
+        r'\{([^{}]{50,})\}',
+    ]:
+        m = re.search(pat, text, re.DOTALL)
+        if m:
+            try:
+                blob = m.group(0) if '"table"' in m.group(0) else '{"table":' + m.group(1) + '}'
+                raw = json.loads(blob)
+                raw_table = raw.get("table", raw)
+                result: dict[str, int] = {}
+                for k, v in raw_table.items():
+                    try:
+                        p = int(str(v).replace(".", "").replace(",", "").replace(" ", ""))
+                        if 5_000 <= p <= 3_000_000:
+                            result[_tr_lower(str(k))] = p
+                    except (ValueError, TypeError):
+                        pass
+                if len(result) >= min_entries:
+                    return result
+            except Exception:
+                pass
+    return {}
+
+
+def _fetch_endeksa_il_table(category: str, trace: list | None = None) -> dict[str, int]:
+    """
+    İL bazlı tablo — ana Endeksa sayfasından tüm şehirlerin Nisan 2026 m² fiyatı.
+    Fallback olarak kullanılır (ilçe bulunamazsa).
+    Returns: {il_norm: tl_per_m2}
+    """
+    cache_key = f"endeksa_il:{category}"
+    if cache_key in _ENDEKSA_TABLE_CACHE:
+        tbl, ts = _ENDEKSA_TABLE_CACHE[cache_key]
+        if time.time() - ts < _ENDEKSA_TABLE_TTL:
+            return tbl
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {}
+
+    url   = f"{_ENDEKSA_BASE}/{category}"
+    title = _IL_TABLE_TITLES.get(category, "")
+
+    prompt = (
+        f"Lütfen şu sayfaya git: {url}\n\n"
+        f"Sayfadaki '{title}' başlıklı tabloda 'Şehirler' sütununda her satır bir Türkiye ili. "
+        f"Her ilin Nisan 2026 sütunundaki m²/TL birim satış fiyatını oku.\n\n"
+        f"SADECE şu JSON formatında yanıt ver:\n"
+        f'{{"table": {{"istanbul": 125000, "ankara": 55000, "izmir": 72000}}}}\n\n'
+        f"İl adlarını Türkçe özel karaktersiz küçük harfle yaz. "
+        f"Fiyatları TL/m² tam sayı olarak ver. Mümkün olduğunca çok il ekle."
+    )
 
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
-        full_text = ""
-        messages = [{"role": "user", "content": prompt}]
-
-        for turn in range(4):
-            resp = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=3000,
-                tools=[tool],
-                messages=messages,
-            )
-            for block in resp.content:
-                if hasattr(block, "text") and block.text:
-                    full_text += block.text
-            log.info(f"Endeksa table turn {turn+1}: stop={resp.stop_reason} chars={len(full_text)}")
-            if resp.stop_reason == "pause_turn":
-                messages.append({"role": "assistant", "content": resp.content})
-                continue
-            break
-
-        # JSON tablosunu çıkar
-        m = re.search(r'\{[^{}]*?"table"\s*:\s*\{[^}]+\}[^{}]*?\}', full_text, re.DOTALL)
-        if not m:
-            m = re.search(r'\{.*?\}', full_text, re.DOTALL)
-        if m:
-            raw = json.loads(m.group())
-            raw_table: dict = raw.get("table", raw)
-            table: dict[str, int] = {}
-            for city_raw, price in raw_table.items():
-                norm = _tr_lower(str(city_raw))
-                try:
-                    p = int(str(price).replace(".", "").replace(",", "").replace(" ", ""))
-                    if 5_000 <= p <= 2_000_000:
-                        table[norm] = p
-                except (ValueError, TypeError):
-                    pass
-
-            if len(table) >= 5:
-                _ENDEKSA_TABLE_CACHE[cache_key] = (table, time.time())
-                log.info(f"Endeksa table fetched: {category} → {len(table)} il, örn. {list(table.items())[:3]}")
-                if trace is not None:
-                    trace.append({
-                        "step": "endeksa_table_fetch",
-                        "category": category, "url": url,
-                        "cities_found": len(table),
-                        "sample": dict(list(table.items())[:5]),
-                    })
-                return table
-
-        log.warning(f"Endeksa table parse başarısız: {category}. raw={full_text[:300]}")
-        if trace is not None:
-            trace.append({"step": "endeksa_table_parse_fail", "raw": full_text[:300]})
-
+        text = _endeksa_web_search(client, prompt, trace)
+        table = _parse_endeksa_json(text, min_entries=5)
+        if table:
+            _ENDEKSA_TABLE_CACHE[cache_key] = (table, time.time())
+            log.info(f"Endeksa il tablo: {category} → {len(table)} il")
+        return table
     except Exception as e:
-        log.error(f"Endeksa table fetch hata: {e}")
-        if trace is not None:
-            trace.append({"step": "endeksa_table_error", "error": str(e)[:200]})
+        log.error(f"Endeksa il tablo hata: {e}")
+        return {}
 
-    return {}
+
+def _fetch_endeksa_ilce_table(city: str, category: str, trace: list | None = None) -> dict[str, int]:
+    """
+    İLÇE bazlı tablo — il sayfasından ilçelere drilldown.
+    URL: endeksa.com/tr/analiz/{city_slug}/endeks/satilik/{category}
+    Returns: {ilce_norm: tl_per_m2}
+    """
+    city_norm = _tr_lower(city or "")
+    slug = _CITY_SLUGS.get(city_norm, city_norm)
+    cache_key = f"endeksa_ilce:{slug}:{category}"
+
+    if cache_key in _ENDEKSA_TABLE_CACHE:
+        tbl, ts = _ENDEKSA_TABLE_CACHE[cache_key]
+        if time.time() - ts < _ENDEKSA_TABLE_TTL:
+            return tbl
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {}
+
+    # İlçe sayfası URL'i
+    url = f"https://www.endeksa.com/tr/analiz/{slug}/endeks/satilik/{category}"
+
+    # Tablo başlığındaki il adı (Türkçe büyük harf)
+    city_display = city.strip().title()
+    ilce_title_suffix = _ILCE_TABLE_TITLES.get(category, "")
+    full_title = f"{city_display} {ilce_title_suffix}"
+
+    prompt = (
+        f"Lütfen şu sayfaya git: {url}\n\n"
+        f"Sayfada '{full_title}' başlıklı tablo var (veya '{city_display}' ve '{ilce_title_suffix}' "
+        f"kelimelerini içeren tablo). Bu tabloda 'İlçeler' sütununda her satır bir ilçe. "
+        f"Her ilçenin Nisan 2026 sütunundaki m²/TL birim satış fiyatını oku.\n\n"
+        f"SADECE şu JSON formatında yanıt ver:\n"
+        f'{{"table": {{"kadikoy": 250000, "besiktas": 280000, "esenyurt": 55000}}}}\n\n'
+        f"İlçe adlarını Türkçe özel karaktersiz küçük harfle yaz "
+        f"(örn. kadikoy, besiktas, uskudar, esenyurt). "
+        f"Fiyatları TL/m² tam sayı olarak ver. Tüm ilçeleri ekle."
+    )
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        text = _endeksa_web_search(client, prompt, trace)
+        table = _parse_endeksa_json(text, min_entries=2)
+        if table:
+            _ENDEKSA_TABLE_CACHE[cache_key] = (table, time.time())
+            log.info(f"Endeksa ilçe tablo: {city}/{category} → {len(table)} ilçe")
+            if trace is not None:
+                trace.append({
+                    "step": "endeksa_ilce_table",
+                    "city": city, "category": category, "url": url,
+                    "districts_found": len(table),
+                    "sample": dict(list(table.items())[:5]),
+                })
+        return table
+    except Exception as e:
+        log.error(f"Endeksa ilçe tablo hata: {e}")
+        return {}
 
 
 def _endeksa_city_m2(
     city: str, district: str, category: str, trace: list | None = None
 ) -> int | None:
     """
-    Endeksa tablosundan il bazlı m²/TL fiyatını döner.
-    Tier 1: Doğrudan Endeksa.com sayfasından tablo okuma (Claude web_search)
-    Tier 2: Serper ile Google Endeksa snippet'leri (fallback)
+    İki kademeli Endeksa fiyat çekimi:
+      1. İlçe bazlı  → il sayfasından ilçeye drill-down (Endeksa web_search)
+      2. İl bazlı    → ilçe bulunamazsa ana sayfa il fiyatı (fallback)
+      3. Serper      → Endeksa ulaşılamazsa Google snippet'leri
+    Returns: TL/m² (tam sayı) veya None
     """
-    # Normalize şehir adı
-    city_norm = _tr_lower(city or "")
+    district_norm = _tr_lower(district or "")
+    city_norm     = _tr_lower(city or "")
 
-    # ── Tier 1: Endeksa tablosundan direkt oku ──────────────────────────────
-    table = _fetch_endeksa_table(category, trace=trace)
-    if table:
-        price = table.get(city_norm)
-        # Alternatif: ilçe adı yerine ili de dene
-        if price is None and district:
-            price = table.get(_tr_lower(district or ""))
+    # ── 1. İlçe bazlı: Endeksa ilçe tablosu ────────────────────────────────
+    if district:
+        ilce_table = _fetch_endeksa_ilce_table(city, category, trace=trace)
+        if ilce_table:
+            price = ilce_table.get(district_norm)
+            # Türkçe karakter varyantlarını da dene (ü→u, ş→s vb.)
+            if price is None:
+                for k, v in ilce_table.items():
+                    if k == district_norm or k.replace("i", "i") == district_norm:
+                        price = v
+                        break
+            if price:
+                log.info(f"Endeksa ilçe hit: {district}/{city} [{category}] → ₺{price:,}/m²")
+                if trace is not None:
+                    trace.append({
+                        "step": "endeksa_ilce_lookup",
+                        "city": city, "district": district, "category": category,
+                        "m2_price": price, "level": "ilçe",
+                        "source": f"Endeksa ilçe tablosu ({city})",
+                    })
+                return price
+            # İlçe adı tabloda yok — il fiyatı fallback'e geç
+            log.info(f"Endeksa: {district} ilçesi tabloda yok, il fiyatına düşülüyor")
+
+    # ── 2. İl bazlı fallback: ana Endeksa tablosu ───────────────────────────
+    il_table = _fetch_endeksa_il_table(category, trace=trace)
+    if il_table:
+        price = il_table.get(city_norm)
         if price:
-            log.info(f"Endeksa table hit: {city} [{category}] → ₺{price:,}/m²")
+            log.info(f"Endeksa il fallback: {city} [{category}] → ₺{price:,}/m²")
             if trace is not None:
                 trace.append({
-                    "step": "endeksa_table_lookup",
+                    "step": "endeksa_il_lookup",
                     "city": city, "category": category,
-                    "m2_price": price,
-                    "source": f"Endeksa tablo {_ENDEKSA_TABLE_URLS[category]}",
+                    "m2_price": price, "level": "il",
+                    "note": f"İlçe ({district}) tablosu bulunamadı, il ortalaması kullanıldı",
                 })
             return price
 
-    # ── Tier 2: Serper — Google Endeksa snippet fallback ────────────────────
+    # ── 3. Serper Google snippet'leri — son çare ────────────────────────────
     cat_tr = {"konut": "konut", "arsa": "arsa", "ticari": "ticari işyeri"}.get(category, category)
     loc = f"{district} {city}".strip() if district else city
-
     queries = [
         f"endeksa {loc} {cat_tr} satılık m2 birim fiyat",
         f"endeksa {city} {category} ortalama metrekare fiyatı",
     ]
-
     all_text = ""
     for q in queries:
-        text = _serper_search(q, num=5)
-        if not text:
+        t = _serper_search(q, num=5)
+        if not t:
             break
-        all_text += "\n" + text
+        all_text += "\n" + t
         prices = _extract_m2_unit_prices(all_text)
-        log.info(f"Endeksa Serper fallback '{q[:50]}' → {prices[:5]}")
         if trace is not None:
             trace.append({"step": "endeksa_serper_fallback", "query": q, "unit_prices": prices})
         if len(prices) >= 2:
             break
 
-    if not all_text:
-        return None
+    if all_text:
+        m2_prices = _extract_m2_unit_prices(all_text)
+        if m2_prices:
+            cleaned = _remove_outliers_iqr(m2_prices) or m2_prices
+            median = int(statistics.median(cleaned))
+            log.info(f"Endeksa Serper: {loc} {category} → ₺{median:,}/m²")
+            return median
 
-    m2_prices = _extract_m2_unit_prices(all_text)
-    if not m2_prices:
-        return None
-
-    cleaned = _remove_outliers_iqr(m2_prices)
-    if not cleaned:
-        cleaned = m2_prices
-    median = int(statistics.median(cleaned))
-    log.info(f"Endeksa Serper fallback: {loc} {category} → ₺{median:,}/m²")
-    return median
+    return None
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -1059,7 +1160,18 @@ def rag_estimate_property(
     if endeksa_m2:
         total = round(endeksa_m2 * square_meters)
         if _PROP_MIN <= total <= _PROP_MAX:
-            loc = f"{city} {district}".strip() if district else city
+            # Trace'ten hangi seviyede fiyat bulunduğunu çek (ilçe mi, il mi?)
+            level_step = next(
+                (s for s in reversed(trace)
+                 if s.get("step") in ("endeksa_ilce_lookup", "endeksa_il_lookup")),
+                None,
+            )
+            level = level_step.get("level", "il") if level_step else "il"
+            loc = (f"{district}, {city}" if district and level == "ilçe" else city)
+            ilce_url = (
+                f"https://www.endeksa.com/tr/analiz/{_CITY_SLUGS.get(_tr_lower(city), _tr_lower(city))}/endeks/satilik/{category}"
+                if level == "ilçe" else endeksa_url
+            )
             result = {
                 "rag_used": True,
                 "tier": 0,
@@ -1068,10 +1180,12 @@ def rag_estimate_property(
                 "confidence": "high",
                 "price_count": 1,
                 "endeksa_category": category,
+                "endeksa_level": level,
                 "reasoning": (
-                    f"{loc} [{category}]: Endeksa ₺{endeksa_m2:,}/m² × {square_meters:.0f}m² = ₺{total:,}."
+                    f"{loc} [{category}, {level} bazlı]: "
+                    f"Endeksa Nisan 2026 ₺{endeksa_m2:,}/m² × {square_meters:.0f}m² = ₺{total:,}."
                 ),
-                "source": f"Endeksa ({endeksa_url})",
+                "source": f"Endeksa.com — {level} bazlı ({ilce_url})",
                 "debug_trace": trace,
             }
             _cache_set(cache_key, result)
