@@ -75,20 +75,66 @@ function DeadlineBadge({ deadline }: { deadline: string }) {
   )
 }
 
+const CACHE_KEY = "bursiq_scholarships_v1"
+const CACHE_TTL = 5 * 60 * 1000 // 5 dakika
+
+function SkeletonCard() {
+  return (
+    <div className="border border-indigo-100 rounded-2xl p-6 bg-white shadow-sm animate-pulse">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="h-5 w-20 bg-indigo-100 rounded-full" />
+        <div className="h-4 w-28 bg-slate-100 rounded-full" />
+      </div>
+      <div className="h-6 w-2/3 bg-slate-200 rounded-lg mb-2" />
+      <div className="h-4 w-full bg-slate-100 rounded-lg mb-3" />
+      <div className="h-4 w-24 bg-indigo-100 rounded-full" />
+    </div>
+  )
+}
+
 export default function LandingPage() {
   const router = useRouter()
   const [scholarships, setScholarships] = useState<Scholarship[]>([])
   const [loading, setLoading] = useState(true)
+  const [slowLoad, setSlowLoad] = useState(false)
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<"all" | "financial" | "academic" | "both">("all")
   const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`${API}/scholarships`)
+    // 1. Önce cache'den anlık göster
+    try {
+      const raw = localStorage.getItem(CACHE_KEY)
+      if (raw) {
+        const { data, ts } = JSON.parse(raw)
+        if (Date.now() - ts < CACHE_TTL && Array.isArray(data) && data.length > 0) {
+          setScholarships(data)
+          setLoading(false)
+        }
+      }
+    } catch { /* localStorage erişim hatası — atla */ }
+
+    // 2. "Yavaş yükleniyor" uyarısını 4 sn sonra göster (cache yoksa)
+    const slowTimer = setTimeout(() => setSlowLoad(true), 4000)
+
+    // 3. Taze veri çek
+    const ctrl = new AbortController()
+    fetch(`${API}/scholarships`, { signal: ctrl.signal })
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then(data => setScholarships(Array.isArray(data) ? data : []))
-      .catch(e => { setScholarships([]); setFetchError(String(e)) })
-      .finally(() => setLoading(false))
+      .then(data => {
+        const arr = Array.isArray(data) ? data : []
+        setScholarships(arr)
+        setFetchError(null)
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data: arr, ts: Date.now() })) } catch { /* ignore */ }
+      })
+      .catch(e => {
+        if ((e as Error).name !== "AbortError") {
+          setFetchError(String(e))
+        }
+      })
+      .finally(() => { clearTimeout(slowTimer); setLoading(false); setSlowLoad(false) })
+
+    return () => { ctrl.abort(); clearTimeout(slowTimer) }
   }, [])
 
   const filtered = scholarships.filter(s => {
@@ -182,15 +228,24 @@ export default function LandingPage() {
       {/* ── Scholarship List ── */}
       <div className="max-w-3xl mx-auto w-full px-6 flex-1">
         {loading ? (
-          <div className="text-center py-24">
-            <div className="w-10 h-10 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-slate-400 font-medium">Yükleniyor…</p>
+          <div className="space-y-4 pb-16">
+            {slowLoad && (
+              <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl text-sm text-amber-700 font-medium mb-2">
+                <span className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin shrink-0" />
+                Sunucu uyandırılıyor, ilk açılış biraz sürebilir…
+              </div>
+            )}
+            <SkeletonCard /><SkeletonCard /><SkeletonCard />
           </div>
-        ) : fetchError ? (
+        ) : fetchError && scholarships.length === 0 ? (
           <div className="text-center py-24">
             <div className="text-5xl mb-4">⚠️</div>
             <p className="text-red-500 font-semibold mb-1">Sunucuya ulaşılamadı.</p>
-            <p className="text-slate-400 text-sm font-mono">{fetchError}</p>
+            <p className="text-slate-400 text-sm font-mono mb-4">{fetchError}</p>
+            <button
+              onClick={() => { setFetchError(null); setLoading(true); fetch(`${API}/scholarships`).then(r=>r.json()).then(d=>{setScholarships(Array.isArray(d)?d:[])}).catch(e=>setFetchError(String(e))).finally(()=>setLoading(false)) }}
+              className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700"
+            >Tekrar Dene</button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-24">
