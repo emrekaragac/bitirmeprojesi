@@ -509,8 +509,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                   <div key={f.id}>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}{f.req && " *"}</label>
                     <input value={values[f.id] || ""} onChange={e => setVal(f.id, e.target.value)}
-                      className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400
-                        ${values[f.id] ? "text-slate-900 font-bold border-indigo-300" : "text-slate-400 border-slate-200"}`} />
+                      className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
+                        ${values[f.id] ? "border-indigo-300" : "border-slate-200"}`} />
                   </div>
                 ))}
               </div>
@@ -524,12 +524,12 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                   maxLength={11}
                   value={values["tc_no"] || ""}
                   onChange={e => setVal("tc_no", e.target.value.replace(/\D/g, "").slice(0, 11))}
-                  className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400
+                  className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
                     ${values["tc_no"]
                       ? values["tc_no"].length === 11
-                        ? "text-slate-900 font-bold border-emerald-400"
-                        : "text-slate-900 font-bold border-red-300"
-                      : "text-slate-400 border-slate-200"}`}
+                        ? "border-emerald-400"
+                        : "border-red-300"
+                      : "border-slate-200"}`}
                   placeholder="11 haneli TC kimlik numarası"
                 />
                 {values["tc_no"] && values["tc_no"].length !== 11 && (
@@ -547,8 +547,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                 <div key={f.id}>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}</label>
                   <input type={f.type} value={values[f.id] || ""} onChange={e => setVal(f.id, e.target.value)}
-                    className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400
-                      ${values[f.id] ? "text-slate-900 font-bold border-indigo-300" : "text-slate-400 border-slate-200"}`} />
+                    className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
+                      ${values[f.id] ? "border-indigo-300" : "border-slate-200"}`} />
                 </div>
               ))}
 
@@ -560,12 +560,12 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                   value={values["email"] || ""}
                   onChange={e => setVal("email", e.target.value)}
                   placeholder="ornek@gmail.com"
-                  className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400
+                  className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
                     ${values["email"]
                       ? /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(values["email"])
-                        ? "text-slate-900 font-bold border-emerald-400"
-                        : "text-slate-900 font-bold border-red-300"
-                      : "text-slate-400 border-slate-200"}`}
+                        ? "border-emerald-400"
+                        : "border-red-300"
+                      : "border-slate-200"}`}
                 />
                 {values["email"] && !values["email"].includes("@") && (
                   <p className="text-xs text-red-500 font-medium mt-1">❌ @ işareti zorunlu (örn: ornek@gmail.com)</p>
@@ -582,8 +582,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                 <div key={f.id}>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}</label>
                   <input type={f.type} value={values[f.id] || ""} onChange={e => setVal(f.id, e.target.value)}
-                    className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400
-                      ${values[f.id] ? "text-slate-900 font-bold border-indigo-300" : "text-slate-400 border-slate-200"}`} />
+                    className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
+                      ${values[f.id] ? "border-indigo-300" : "border-slate-200"}`} />
                 </div>
               ))}
               <div>
@@ -703,14 +703,68 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                     </select>
                   )}
 
-                  {(q.type === "text" || q.type === "number") && (
+                  {(q.type === "text" || q.type === "number") && q.id !== "gpa" && (
                     <input
                       type={q.type === "number" ? "number" : "text"}
                       value={values[q.id] || ""}
                       onChange={e => setVal(q.id, e.target.value)}
                       placeholder={q.type === "number" ? "0" : ""}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400"
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400"
                     />
+                  )}
+
+                  {/* GPA — önce scale seç, sonra enforce'lu input */}
+                  {q.id === "gpa" && (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        {GPA_SYSTEM_OPTIONS.map(o => (
+                          <button
+                            key={o.val}
+                            type="button"
+                            onClick={() => {
+                              setVal("gpa_system", o.val)
+                              setVal("gpa", "") // scale değişince değeri sıfırla
+                            }}
+                            className={`flex-1 py-2 text-xs font-semibold rounded-xl border-2 transition
+                              ${values["gpa_system"] === o.val
+                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                : "border-slate-200 bg-white text-slate-500 hover:border-indigo-300"}`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="number"
+                        value={values[q.id] || ""}
+                        min={0}
+                        max={values["gpa_system"] === "4" ? 4 : 100}
+                        step={values["gpa_system"] === "4" ? 0.01 : 1}
+                        placeholder={
+                          !values["gpa_system"]
+                            ? "Önce ölçeği seçin"
+                            : values["gpa_system"] === "4"
+                              ? "0.00 – 4.00"
+                              : "0 – 100"
+                        }
+                        disabled={!values["gpa_system"]}
+                        onChange={e => {
+                          const raw = e.target.value
+                          if (raw === "" || raw === "-") { setVal(q.id, raw); return }
+                          const num = parseFloat(raw)
+                          if (isNaN(num)) return
+                          const maxVal = values["gpa_system"] === "4" ? 4 : 100
+                          setVal(q.id, String(Math.min(Math.max(num, 0), maxVal)))
+                        }}
+                        className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed
+                          ${values["gpa_system"] ? "border-indigo-300" : "border-slate-200"}`}
+                      />
+                      {values["gpa_system"] && values[q.id] && (
+                        <p className="text-xs text-slate-400">
+                          Max: <strong>{values["gpa_system"] === "4" ? "4.00" : "100"}</strong> — girilen: <strong className="text-indigo-600">{values[q.id]}</strong>
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   {/* Sub-fields for car */}
