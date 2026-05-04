@@ -137,7 +137,11 @@ export default function LandingPage() {
     return () => { ctrl.abort(); clearTimeout(slowTimer) }
   }, [])
 
-  const filtered = scholarships.filter(s => {
+  const activeScholarships = scholarships.filter(s =>
+    !s.deadline || new Date(s.deadline) >= new Date()
+  )
+
+  const filtered = activeScholarships.filter(s => {
     const matchSearch = !search ||
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.description.toLowerCase().includes(search.toLowerCase())
@@ -186,7 +190,7 @@ export default function LandingPage() {
         {/* Stats row */}
         <div className="flex items-center justify-center gap-8 mt-10">
           {[
-            { n: scholarships.length, label: "Aktif Burs" },
+            { n: activeScholarships.length, label: "Aktif Burs" },
             { n: "AI", label: "Destekli Analiz" },
             { n: "100%", label: "Şeffaf Puanlama" },
           ].map(({ n, label }) => (
@@ -249,8 +253,8 @@ export default function LandingPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-24">
-            <div className="text-5xl mb-4">{scholarships.length === 0 ? "📭" : "🔍"}</div>
-            {scholarships.length === 0 ? (
+            <div className="text-5xl mb-4">{activeScholarships.length === 0 ? "📭" : "🔍"}</div>
+            {activeScholarships.length === 0 ? (
               <>
                 <p className="text-slate-500 font-medium mb-3">Henüz burs eklenmemiş.</p>
                 <a href="/setup" className="text-indigo-600 hover:text-indigo-800 font-bold underline">
