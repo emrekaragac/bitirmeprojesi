@@ -328,17 +328,27 @@ def parse_transcript(file_path: str) -> dict:
         result["bolum"] = bolum_match.group(1).strip()
 
     # Öğrenci adı — birden fazla etiket formatını dene
+    # Daha spesifik (etiket+iki nokta) pattern'lar önce gelir;
+    # "AD SOYAD" tablo başlığı gibi belirsiz etiketler sona bırakılır.
     name_patterns = [
-        r'(?:ÖĞRENCİN[İI]N\s+)?ADI?\s+SOYADI?[:\s]+([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
-        r'(?:STUDENT\s+)?NAME[:\s]+([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
-        r'ÖĞRENCİ[:\s]+([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
-        r'AD\s+SOYAD[:\s]+([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
+        r'(?:ÖĞRENCİN[İI]N\s+)?ADI?\s+SOYADI?\s*:\s*([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
+        r'(?:STUDENT\s+)?NAME\s*:\s*([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
+        r'ÖĞRENCİ\s*:\s*([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
+        r'AD\s+SOYAD\s*:\s*([A-ZÇĞİÖŞÜa-zçğışöşü ]{4,50})',
     ]
+    # Transkript tablo başlıklarında geçen anahtar kelimeler — bunları içeren
+    # capture'lar isim değil başlık/sütun metnidir, atla.
+    _NON_NAME_KEYWORDS = {
+        "KREDİ", "KREDI", "AKTS", "ECTS", "TÜRÜ", "TURU", "KOD", "NOT",
+        "BÖLÜM", "BOLUM", "PROGRAM", "DÖNEM", "DONEM", "YIL", "SINIF",
+        "TOPLAM", "ORTALAMA", "GNO", "GPA", "CGPA", "TRANSKRIPT",
+    }
     for pat in name_patterns:
         m = re.search(pat, text, re.IGNORECASE)
         if m:
             candidate = m.group(1).strip().split('\n')[0].strip()
-            if 3 < len(candidate) < 60:
+            upper_words = {w.upper() for w in candidate.split()}
+            if 3 < len(candidate) < 60 and not upper_words & _NON_NAME_KEYWORDS:
                 result["ogrenci_adi"] = candidate
                 break
 
