@@ -60,52 +60,53 @@ const OPTION_LABELS: Record<string, string> = {
 }
 
 // ── Akıllı otomatik skor şablonları ─────────────────────────────────────────
+// NOT: Normalizasyon motoru raw/max*100 formülü kullandığından
+// "ideal" cevap 100 olmalı; diğerleri oransal olabilir.
 const SMART_SCORES: Record<string, Record<string, number>> = {
   // Finansal sorular
   monthly_income:    { under_22000: 100, "22000_40000": 75, "40000_75000": 45, "75000_150000": 15, over_150000: 0 },
-  has_car:           { yes: 0, no: 30 },
-  has_house:         { yes: 0, no: 40 },
-  is_renting:        { yes: 80, no: 0 },
-  parents_divorced:  { yes: 70, no: 0 },
-  father_working:    { yes: 0, no: 60 },
-  mother_working:    { yes: 0, no: 40 },
-  everyone_healthy:  { yes: 0, no: 70 },
+  has_car:           { yes: 0, no: 100 },
+  has_house:         { yes: 0, no: 100 },
+  is_renting:        { yes: 100, no: 0 },
+  parents_divorced:  { yes: 100, no: 0 },
+  father_working:    { yes: 0, no: 100 },
+  mother_working:    { yes: 0, no: 100 },
+  everyone_healthy:  { yes: 0, no: 100 },
   other_scholarship: { yes: 0, no: 100 },
-  works_part_time:   { yes: 30, no: 0 },
-  has_debt:          { yes: 80, no: 0 },
-  siblings_in_uni:   { yes: 80, no: 0 },
-  family_retired:    { yes: 30, no: 0 },
-  family_supporting: { yes: 80, no: 0 },
+  works_part_time:   { yes: 100, no: 0 },
+  has_debt:          { yes: 100, no: 0 },
+  siblings_in_uni:   { yes: 100, no: 0 },
+  family_retired:    { yes: 100, no: 0 },
+  family_supporting: { yes: 100, no: 0 },
   sudden_income_loss:{ yes: 100, no: 0 },
-  has_disability:    { yes: 80, no: 0 },
-  family_needs_care: { yes: 80, no: 0 },
+  has_disability:    { yes: 100, no: 0 },
+  family_needs_care: { yes: 100, no: 0 },
   family_size:       { "1-2": 20, "3-4": 60, "5-6": 85, "7+": 100 },
-  siblings_count:    { "0": 10, "1": 40, "2": 65, "3+": 90 },
+  siblings_count:    { "0": 10, "1": 40, "2": 65, "3+": 100 },
   first_gen_grad:    { none_grad: 100, one_grad: 60, two_plus_grad: 20 },
   highschool_location:{ village: 100, town: 60, big_city: 20 },
   device_access:     { school_only: 100, shared: 60, own_device: 20 },
-  // Akademik sorular
+  // Akademik sorular — GPA 4.0 skala aralıkları (motor 100→4.0 normalize eder)
   gpa:               { "0-2": 10, "2-2.99": 40, "3-3.49": 70, "3.5-3.79": 90, "3.8-4": 100 },
-  gpa_system:        { "4": 50, "100": 50 },
   has_research:      { yes: 100, no: 0 },
   has_award:         { yes: 100, no: 0 },
   language_level:    { none: 0, A1: 10, A2: 20, B1: 40, B2: 60, C1: 85, C2: 100 },
-  has_activity:      { yes: 60, no: 0 },
-  has_lang_cert:     { yes: 80, no: 0 },
-  has_intl_exp:      { yes: 80, no: 0 },
+  has_activity:      { yes: 100, no: 0 },
+  has_lang_cert:     { yes: 100, no: 0 },
+  has_intl_exp:      { yes: 100, no: 0 },
   has_patent:        { yes: 100, no: 0 },
-  has_tubitak:       { yes: 90, no: 0 },
+  has_tubitak:       { yes: 100, no: 0 },
   // Liderlik sorular
-  has_leadership_role: { yes: 90, no: 0 },
+  has_leadership_role: { yes: 100, no: 0 },
   volunteer_hours:   { "0h": 0, "1_10h": 30, "11_50h": 70, "50h_plus": 100 },
-  has_social_project:{ yes: 90, no: 0 },
+  has_social_project:{ yes: 100, no: 0 },
   has_youth_platform:{ yes: 100, no: 0 },
-  has_startup:       { yes: 80, no: 0 },
+  has_startup:       { yes: 100, no: 0 },
 }
 
 function defaultScores(q: Omit<Question, "weight" | "answer_scores">): Record<string, number> {
   if (SMART_SCORES[q.id]) return { ...SMART_SCORES[q.id] }
-  if (q.type === "yesno") return { yes: 50, no: 0 }
+  if (q.type === "yesno") return { yes: 100, no: 0 }
   if (q.type === "select" && q.options) {
     const n = q.options.length
     return Object.fromEntries(q.options.map((o, i) => [o, Math.round(100 - (100 / (n - 1 || 1)) * i)]))
@@ -156,8 +157,7 @@ const FINANCIAL_QUESTIONS: QTemplate[] = [
 ]
 
 const ACADEMIC_QUESTIONS: QTemplate[] = [
-  { id: "gpa",            label: "GPA",                                                                       type: "number", required: true  },
-  { id: "gpa_system",     label: "GPA System (4 or 100)",                        type: "select", options: ["4","100"],                         required: true  },
+  { id: "gpa",            label: "GPA (4.0 veya 100 skala — sistem adaydan seçilir)", type: "number", required: true  },
   { id: "has_research",   label: "Involved in research?",                                                     type: "yesno",  required: false },
   { id: "has_award",      label: "Has academic award?",                                                       type: "yesno",  required: false },
   { id: "language_level", label: "Foreign language level",                        type: "select", options: ["none","A1","A2","B1","B2","C1","C2"], required: false },

@@ -372,6 +372,33 @@ def scholarship_create(body: ScholarshipCreateRequest):
     return {"id": sid, "message": "Scholarship created"}
 
 
+@app.patch("/scholarship/{sid}/config")
+def scholarship_update_config(sid: str, body: dict, x_admin_key: str = Header(None)):
+    """Admin-only: update scholarship config (questions/answer_scores/weights)"""
+    import os, json, psycopg2
+    expected = os.getenv("ADMIN_KEY", "psds-admin-2025")
+    if x_admin_key != expected:
+        raise HTTPException(status_code=403, detail="Admin key required")
+    try:
+        conn = psycopg2.connect(os.getenv("DATABASE_URL", ""))
+        cur = conn.cursor()
+        cur.execute("SELECT config FROM scholarships WHERE id = %s", (sid,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Scholarship not found")
+        current = json.loads(row[0])
+        current.update(body.get("config", body))
+        cur.execute("UPDATE scholarships SET config = %s WHERE id = %s",
+                    (json.dumps(current, ensure_ascii=False), sid))
+        conn.commit()
+        cur.close(); conn.close()
+        return {"ok": True, "id": sid}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/scholarships")
 def scholarships_list():
     """Public endpoint — returns all scholarships (no admin key needed)"""

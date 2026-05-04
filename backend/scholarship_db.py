@@ -126,6 +126,17 @@ def get_all_scholarships():
     return result
 
 
+def update_scholarship_config(sid: str, config: dict):
+    """Scholarship config'ini (questions/documents/answer_scores) günceller."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("UPDATE scholarships SET config = %s WHERE id = %s",
+                (json.dumps(config, ensure_ascii=False), sid))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
 def save_scholarship_application(scholarship_id: str, form_data: dict, scores: dict, verification: dict = None) -> int:
     conn = get_conn()
     cur = conn.cursor()
