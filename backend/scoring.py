@@ -1,6 +1,9 @@
 """
 Burs Karar Destek Sistemi - Skorlama Motoru
 0-100 arasi puan: 100 = en cok ihtiyac sahibi (en kotu maddi durum)
+
+Varlik degerlendirmesi: Fiyat arttikca puan dususu artar.
+Ev veya araba sahibi olmak puani onemli olcude dusurebilir.
 """
 
 
@@ -10,7 +13,7 @@ def compute_scores(form_data: dict) -> dict:
     breakdown = {}
 
     # ─────────────────────────────────────────────
-    # 1. Aylik Gelir (max 30 puan) — en kritik faktor
+    # 1. Aylik Gelir (max 35 puan) — en kritik faktor
     # ─────────────────────────────────────────────
     monthly_income = form_data.get("monthly_income", "")
     family_size = _safe_int(form_data.get("family_size", 0))
@@ -18,17 +21,19 @@ def compute_scores(form_data: dict) -> dict:
     income_score = _income_score(monthly_income, family_size)
     score += income_score
     breakdown["income"] = income_score
-    if income_score >= 25:
+    if income_score >= 28:
         reasons.append("Very low family income — highest financial need")
-    elif income_score >= 18:
+    elif income_score >= 20:
         reasons.append("Low family income")
-    elif income_score >= 10:
+    elif income_score >= 12:
         reasons.append("Moderate family income")
     elif income_score > 0:
         reasons.append("Above-average family income — lower financial need")
 
     # ─────────────────────────────────────────────
-    # 2. Konut Durumu (max 15 puan)
+    # 2. Konut Durumu (aralik: -15 ile +20 puan)
+    #    2025 Turkiye piyasa fiyatlarina gore guncel esikler.
+    #    Pahali ev sahipligi sert negatif puan getirir.
     # ─────────────────────────────────────────────
     has_house = form_data.get("has_house", "no")
     property_value = _safe_float(form_data.get("property_estimated_value"))
@@ -37,64 +42,84 @@ def compute_scores(form_data: dict) -> dict:
 
     if has_house == "no":
         if is_renting == "yes":
-            housing_score = 15
+            housing_score = 20
             reasons.append("No house ownership — currently renting")
         else:
-            housing_score = 10
+            housing_score = 14
             reasons.append("No house ownership")
     else:
         if property_value is not None:
-            if property_value < 2_000_000:
+            if property_value < 3_000_000:
+                # Kucuk sehir / eski yapı — cok dusuk deger
                 housing_score = 8
-                reasons.append("Low-value property (< 2M TL)")
-            elif property_value < 5_000_000:
-                housing_score = 5
-                reasons.append("Moderate-value property (2-5M TL)")
-            elif property_value < 10_000_000:
+                reasons.append("Low-value property (< 3M TL)")
+            elif property_value < 8_000_000:
+                # Orta buyukluk sehir standart konut
                 housing_score = 2
-                reasons.append("High-value property (5-10M TL)")
+                reasons.append("Moderate-value property (3-8M TL)")
+            elif property_value < 20_000_000:
+                # Buyuk sehir / iyi semt
+                housing_score = -5
+                reasons.append("High-value property (8-20M TL) — asset deduction applied")
+            elif property_value < 40_000_000:
+                # Istanbul / Ankara premium
+                housing_score = -10
+                reasons.append("Premium property (20-40M TL) — significant asset deduction")
             else:
-                housing_score = 0
-                reasons.append("Very high-value property (> 10M TL) — lower priority")
+                # Luks / çok degerli mulk
+                housing_score = -15
+                reasons.append("Luxury property (> 40M TL) — major asset deduction")
         else:
-            housing_score = 5
+            # Deger bilinmiyor — orta ihtiyatli puan
+            housing_score = 4
+            reasons.append("House ownership — value not determined")
 
     score += housing_score
     breakdown["housing"] = housing_score
 
-    # Kira yuku bonus
+    # Kira yuku bonusu (max 5 puan)
     if is_renting == "yes" and monthly_rent and monthly_rent > 0:
-        rent_score = min(5, int(monthly_rent / 5000))
+        rent_score = min(5, int(monthly_rent / 8_000))
         score += rent_score
         breakdown["rent_burden"] = rent_score
         if rent_score > 0:
             reasons.append("Monthly rent burden: {:,} TL".format(int(monthly_rent)))
+    else:
+        breakdown["rent_burden"] = 0
 
     # ─────────────────────────────────────────────
-    # 3. Arac Durumu (max 10 puan)
+    # 3. Arac Durumu (aralik: -10 ile +15 puan)
+    #    2025 Turkiye otomobil piyasasina gore guncel esikler.
+    #    Lüks / pahali arac sahipligi ciddi kesinti getirir.
     # ─────────────────────────────────────────────
     has_car = form_data.get("has_car", "no")
     car_value = _safe_float(form_data.get("estimated_car_value"))
 
     if has_car == "no":
-        car_score = 10
+        car_score = 15
         reasons.append("No vehicle ownership")
     else:
         if car_value is not None:
-            if car_value < 300_000:
-                car_score = 7
-                reasons.append("Old/low-value vehicle (< 300K TL)")
-            elif car_value < 800_000:
-                car_score = 4
-                reasons.append("Mid-value vehicle (300K-800K TL)")
-            elif car_value < 2_000_000:
-                car_score = 1
-                reasons.append("High-value vehicle (800K-2M TL)")
-            else:
+            if car_value < 500_000:
+                # Cok eski / hurda siniri arac
+                car_score = 8
+                reasons.append("Old/very low-value vehicle (< 500K TL)")
+            elif car_value < 1_500_000:
+                # Normal ikinci el arac
+                car_score = 3
+                reasons.append("Standard used vehicle (500K-1.5M TL)")
+            elif car_value < 3_000_000:
+                # Yeni / gorece pahali arac
                 car_score = -3
-                reasons.append("Luxury vehicle (> 2M TL) — lower priority")
+                reasons.append("Expensive vehicle (1.5M-3M TL) — asset deduction applied")
+            else:
+                # Luks / spor arac
+                car_score = -10
+                reasons.append("Luxury/sports vehicle (> 3M TL) — major asset deduction")
         else:
-            car_score = 3
+            # Deger bilinmiyor — ihtiyatli orta puan
+            car_score = 2
+            reasons.append("Vehicle ownership — value not determined")
 
     score += car_score
     breakdown["vehicle"] = car_score
@@ -105,7 +130,7 @@ def compute_scores(form_data: dict) -> dict:
     family_score = 0
 
     if form_data.get("parents_divorced", "no") == "yes":
-        family_score += 6
+        family_score += 5
         reasons.append("Parents are divorced")
 
     if form_data.get("father_working", "yes") == "no":
@@ -117,7 +142,7 @@ def compute_scores(form_data: dict) -> dict:
         reasons.append("Mother is not working")
 
     if form_data.get("everyone_healthy", "yes") == "no":
-        family_score += 7
+        family_score += 8
         reasons.append("Chronic illness / health issue in the family")
 
     siblings = _safe_int(form_data.get("siblings_count", 0))
@@ -157,7 +182,7 @@ def compute_scores(form_data: dict) -> dict:
     else:
         breakdown["part_time_work"] = 0
 
-    # Skoru 0-100 arasin a kisitla
+    # Skoru 0-100 arasina kisitla
     score = max(0, min(score, 100))
 
     # Oncelik siniflandirmasi
@@ -218,7 +243,7 @@ def _income_score(monthly_income_bracket, family_size):
     }
 
     if not monthly_income_bracket or monthly_income_bracket not in bracket_mid:
-        return 12  # bilinmiyor → orta puan
+        return 14  # bilinmiyor → orta puan
 
     mid = bracket_mid[monthly_income_bracket]
     size = max(1, family_size)
@@ -226,11 +251,11 @@ def _income_score(monthly_income_bracket, family_size):
 
     # Kişi başı aylık gelir eşikleri (2025 fiyat seviyesi)
     if per_person < 10_000:
-        return 30
+        return 35
     elif per_person < 18_000:
-        return 24
+        return 28
     elif per_person < 30_000:
-        return 16
+        return 18
     elif per_person < 55_000:
         return 8
     else:
