@@ -625,26 +625,22 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               </div>
             </div>
 
-            {/* KVKK Açık Rıza */}
+            {/* Data Privacy Consent */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-slate-700 text-sm flex items-center gap-2">
-                  <span>🔒</span> Data Privacy Consent
-                </h3>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-lg shrink-0">🔒</div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-slate-800">Data Privacy Consent</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Required before submitting your application</p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setKvkkOpen(v => !v)}
-                  className="text-xs text-indigo-600 font-semibold hover:underline"
+                  onClick={() => setKvkkOpen(true)}
+                  className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-semibold px-3 py-1.5 rounded-lg transition whitespace-nowrap"
                 >
-                  {kvkkOpen ? "Hide ▲" : "Read Policy ▼"}
+                  Read Policy →
                 </button>
               </div>
-
-              {kvkkOpen && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 max-h-64 overflow-y-auto text-xs text-slate-600 leading-relaxed whitespace-pre-wrap font-mono">
-                  {KVKK_TEXT}
-                </div>
-              )}
 
               <label className="flex items-start gap-3 cursor-pointer select-none">
                 <input
@@ -654,8 +650,11 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                   className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
                 />
                 <span className="text-xs text-slate-600 leading-snug">
-                  I confirm that I have read and understood the above notice and freely consent to the processing of my personal data for the stated purposes,{" "}
-                  <span className="font-semibold">including international transfer to Anthropic Inc.</span>
+                  I have read and agree to the{" "}
+                  <button type="button" onClick={() => setKvkkOpen(true)} className="text-indigo-600 font-semibold underline underline-offset-2">
+                    Data Processing Notice
+                  </button>
+                  , including international transfer to Anthropic Inc.
                 </span>
               </label>
 
@@ -665,6 +664,115 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                 </p>
               )}
             </div>
+
+            {/* Privacy Policy Full-Screen Modal */}
+            {kvkkOpen && (
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+                <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[85vh]">
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🔒</span>
+                      <div>
+                        <p className="font-black text-slate-800 text-sm">Data Processing Notice</p>
+                        <p className="text-xs text-slate-400">BursIQ · 2025–2026</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setKvkkOpen(false)}
+                      className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 text-lg font-bold transition"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  {/* Scrollable body */}
+                  <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5 text-sm text-slate-700 leading-relaxed">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Data Controller</p>
+                      <p className="font-semibold">Parametric Scholarship Distribution System (BursIQ)</p>
+                    </div>
+
+                    {[
+                      {
+                        title: "1. Personal Data Collected",
+                        items: [
+                          { label: "Identity & Contact", text: "First name, last name, date of birth, email address, phone number, residential address." },
+                          { label: "Financial Data", text: "Household income level, real estate and vehicle ownership, debt obligations, family size and income status. Declared asset details are processed alongside public market data for valuation." },
+                          { label: "Academic Data", text: "GPA, transcript, certificates, language qualifications, research activities." },
+                          { label: "Leadership & Social Impact", text: "Club memberships, volunteer activities, entrepreneurship experience." },
+                          { label: "Uploaded Documents", text: "Processed via OCR for cross-validation against form declarations. A trust score (0–100) is calculated per application." },
+                        ]
+                      },
+                      {
+                        title: "2. Purposes of Processing",
+                        items: [
+                          { text: "Receiving, evaluating and concluding scholarship applications" },
+                          { text: "Verifying declared assets against current market data" },
+                          { text: "Auditing consistency between uploaded documents and form declarations" },
+                          { text: "Scoring applications according to the scholarship's weighted formula" },
+                          { text: "Displaying the ranked applicant list to system administrators" },
+                        ]
+                      },
+                    ].map(section => (
+                      <div key={section.title}>
+                        <p className="font-black text-slate-800 text-xs uppercase tracking-wide mb-3">{section.title}</p>
+                        <div className="space-y-2">
+                          {section.items.map((item, i) => (
+                            <div key={i} className="flex gap-2 text-xs">
+                              <span className="text-indigo-400 shrink-0 mt-0.5">•</span>
+                              <span>{"label" in item && <strong>{item.label}: </strong>}{item.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    <div>
+                      <p className="font-black text-slate-800 text-xs uppercase tracking-wide mb-3">3. Data Recipients</p>
+                      <div className="space-y-2 text-xs">
+                        <div className="bg-slate-50 rounded-xl p-3">
+                          <p className="font-semibold text-slate-700 mb-0.5">System Administrators</p>
+                          <p className="text-slate-500">Your application and score breakdown are only accessible to BursIQ administrators. Data is not shared with any scholarship provider or third party.</p>
+                        </div>
+                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                          <p className="font-semibold text-amber-800 mb-0.5">⚠️ Anthropic Inc. (International Transfer)</p>
+                          <p className="text-amber-700">During asset valuation, vehicle or property attributes (brand, model, year, location) are sent to Anthropic's Claude AI. Your name, national ID, and contact details are <strong>not</strong> included in this transfer.</p>
+                        </div>
+                        <div className="bg-slate-50 rounded-xl p-3">
+                          <p className="font-semibold text-slate-700 mb-0.5">Infrastructure Providers</p>
+                          <p className="text-slate-500">Vercel (frontend) and Render (backend) act as technical processors and cannot independently access your personal data.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="font-black text-slate-800 text-xs uppercase tracking-wide mb-2">4. Retention & Your Rights</p>
+                      <p className="text-xs text-slate-500">Data is retained for the period required by applicable regulations after evaluation, then securely deleted or anonymised. You have the right to access, correct, delete, and object to processing of your personal data at any time.</p>
+                    </div>
+                  </div>
+
+                  {/* Footer CTA */}
+                  <div className="px-5 py-4 border-t border-slate-100 shrink-0 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setKvkkOpen(false)}
+                      className="flex-1 rounded-xl bg-slate-100 text-slate-600 font-semibold py-3 text-sm hover:bg-slate-200 transition"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setKvkkAccepted(true); setKvkkOpen(false) }}
+                      className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 text-sm"
+                    >
+                      ✅ I Accept
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <button
               onClick={() => goStep(1)}
