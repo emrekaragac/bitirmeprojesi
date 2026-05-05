@@ -402,14 +402,14 @@ export default function AdminPage() {
               <div>
                 <h3 className="font-bold text-slate-700 text-sm mb-3">Form Data</h3>
                 <div className="space-y-1.5">
-                  {Object.entries(detail.form_data).map(([k, v]) => (
-                    v !== null && v !== "" && (
+                  {Object.entries(detail.form_data).map(([k, v]) =>
+                    v !== null && v !== "" ? (
                       <div key={k} className="flex justify-between text-xs">
                         <span className="text-slate-400 capitalize">{k.replace(/_/g, " ")}</span>
                         <span className="text-slate-700 font-medium text-right max-w-[55%]">{String(v)}</span>
                       </div>
-                    )
-                  ))}
+                    ) : null
+                  )}
                 </div>
               </div>
 
