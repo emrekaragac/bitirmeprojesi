@@ -42,11 +42,11 @@ const DOC_OPTIONS: { id: DocType; label: string; icon: string; desc: string }[] 
 ]
 
 const OPTION_LABELS: Record<string, string> = {
-  under_22000: "₺22.000 altı (asgari ücret altı)",
+  under_22000: "Below ₺22,000 (below minimum wage)",
   "22000_40000": "₺22.000 – ₺40.000",
   "40000_75000": "₺40.000 – ₺75.000",
   "75000_150000": "₺75.000 – ₺150.000",
-  over_150000: "₺150.000 üstü",
+  over_150000: "Above ₺150,000",
   "4": "4.0 Scale", "100": "100 Scale",
   none: "None", A1: "A1", A2: "A2", B1: "B1", B2: "B2", C1: "C1", C2: "C2",
   yes: "Yes", no: "No",
@@ -157,7 +157,7 @@ const FINANCIAL_QUESTIONS: QTemplate[] = [
 ]
 
 const ACADEMIC_QUESTIONS: QTemplate[] = [
-  { id: "gpa",            label: "GPA (4.0 veya 100 skala — sistem adaydan seçilir)", type: "number", required: true  },
+  { id: "gpa",            label: "GPA (applicant selects 4.0 or 100 scale)", type: "number", required: true  },
   { id: "has_research",   label: "Involved in research?",                                                     type: "yesno",  required: false },
   { id: "has_award",      label: "Has academic award?",                                                       type: "yesno",  required: false },
   { id: "language_level", label: "Foreign language level",                        type: "select", options: ["none","A1","A2","B1","B2","C1","C2"], required: false },
@@ -326,11 +326,11 @@ export default function SetupPage() {
                 : "bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95"
             }`}
           >
-            {linkCopied ? "✅ Kopyalandı!" : "📋 Copy Link"}
+            {linkCopied ? "✅ Copied!" : "📋 Copy Link"}
           </button>
           <a href="/admin" className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm text-center">Admin →</a>
         </div>
-        <a href="/" className="mt-3 block text-center text-sm font-semibold text-indigo-500 hover:text-indigo-700">← Ana Sayfaya Dön</a>
+        <a href="/" className="mt-3 block text-center text-sm font-semibold text-indigo-500 hover:text-indigo-700">← Back to Home</a>
         <button
           onClick={() => { setCreatedId(null); setStep(0); setConfig({ name:"",description:"",deadline:"",type:"financial",financial_weight:100,academic_weight:0,documents:[],questions:[] }) }}
           className="mt-1 text-xs text-slate-400 hover:text-slate-600">
@@ -580,18 +580,18 @@ export default function SetupPage() {
           <div className="space-y-5">
             <div>
               <h2 className="text-xl font-black text-slate-800 mb-1">Weights & Answer Scores</h2>
-              <p className="text-slate-500 text-sm">Ağırlıklar ve puanlar otomatik atandı. İstersen değiştirebilirsin.</p>
+              <p className="text-slate-500 text-sm">Weights and scores were auto-assigned. You can adjust them below.</p>
             </div>
 
             <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold text-indigo-800">✨ Otomatik skor atandı</p>
-                <p className="text-xs text-indigo-600 mt-0.5">Ağırlıklar eşit dağıtıldı, cevap puanları soru tipine göre ayarlandı.</p>
+                <p className="text-sm font-semibold text-indigo-800">✨ Scores auto-assigned</p>
+                <p className="text-xs text-indigo-600 mt-0.5">Weights distributed equally; answer scores set by question type.</p>
               </div>
               <button
                 onClick={() => setConfig(prev => ({ ...prev, questions: autoAssignWeights(prev.questions) }))}
                 className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-700 transition whitespace-nowrap ml-3">
-                Sıfırla
+                Reset
               </button>
             </div>
 
@@ -635,9 +635,9 @@ export default function SetupPage() {
                   <div className="border-t border-slate-100 pt-3">
                     <p className="text-xs font-semibold text-slate-500 mb-2">
                       Answer Scores
-                      <span className="ml-1 font-normal text-slate-400">(0 = düşük öncelik, 100 = yüksek öncelik)</span>
+                      <span className="ml-1 font-normal text-slate-400">(0 = low priority, 100 = high priority)</span>
                       {q.weight > 0 && Object.values(q.answer_scores).every(s => s === 0) && (
-                        <span className="ml-2 text-amber-600 font-bold">⚠️ Henüz puan girilmedi!</span>
+                        <span className="ml-2 text-amber-600 font-bold">⚠️ No scores set yet!</span>
                       )}
                     </p>
                     <div className="space-y-2">
@@ -737,7 +737,7 @@ export default function SetupPage() {
                           </div>
                           {allZero && q.weight > 0 && (
                             <p className="text-amber-700 mt-1 font-medium">
-                              ⚠️ Tüm cevap puanları 0 — bu soru hiç puan vermeyecek. Geri dönüp puan ayarlayın.
+                              ⚠️ All answer scores are 0 — this question won't contribute any points. Go back and set scores.
                             </p>
                           )}
                         </div>

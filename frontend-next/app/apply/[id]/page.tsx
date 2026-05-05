@@ -42,11 +42,11 @@ type Result = {
 }
 
 const INCOME_OPTIONS = [
-  { val: "under_22000",   label: "₺22.000 altı — asgari ücret altı" },
-  { val: "22000_40000",   label: "₺22.000 – ₺40.000" },
-  { val: "40000_75000",   label: "₺40.000 – ₺75.000" },
-  { val: "75000_150000",  label: "₺75.000 – ₺150.000" },
-  { val: "over_150000",   label: "₺150.000 üstü" },
+  { val: "under_22000",   label: "Below ₺22,000 — below minimum wage" },
+  { val: "22000_40000",   label: "₺22,000 – ₺40,000" },
+  { val: "40000_75000",   label: "₺40,000 – ₺75,000" },
+  { val: "75000_150000",  label: "₺75,000 – ₺150,000" },
+  { val: "over_150000",   label: "Above ₺150,000" },
 ]
 
 const GPA_SYSTEM_OPTIONS = [
@@ -65,59 +65,58 @@ const LANG_OPTIONS = [
 ]
 
 // ── KVKK Metni ──────────────────────────────────────────────
-const KVKK_TEXT = `PSDS — Açık Rıza Beyanı
+const KVKK_TEXT = `BursIQ — Data Processing Consent
 
-Veri Sorumlusu: Parametrik Burs Dağıtım Sistemi (PSDS)
-Kapsam: Burs başvurusu kapsamında işlenecek tüm kişisel veriler
-Dayanak: 6698 Sayılı Kişisel Verilerin Korunması Kanunu (KVKK)
+Data Controller: Parametric Scholarship Distribution System (BursIQ)
+Scope: All personal data processed within the scope of the scholarship application
+Legal Basis: Personal data protection regulations applicable to academic research systems
 
-1. İŞLENECEK KİŞİSEL VERİLER
+1. PERSONAL DATA COLLECTED
 
-a) Kimlik ve İletişim Bilgileri
-Ad, soyad, doğum tarihi, e-posta adresi, telefon numarası, ikamet adresi.
+a) Identity & Contact Information
+First name, last name, date of birth, email address, phone number, residential address.
 
-b) Finansal Veriler
-Hane halkı gelir düzeyi, taşınmaz mülkiyet bilgisi, araç mülkiyeti, borç yükümlülükleri, aile fertleri sayısı ve gelir durumları. Beyan ettiğiniz araç ve/veya taşınmaz bilgileri (marka, model, yıl, konum gibi özellikler), piyasa değeri tahmini amacıyla kamuya açık Türk ilan platformlarından (arabam.com, hepsiemlak.com, sahibinden.com) toplanan güncel fiyat verileriyle birlikte işlenmektedir.
+b) Financial Data
+Household income level, real estate ownership, vehicle ownership, debt obligations, number of family members and their income status. Declared vehicle and/or property details (brand, model, year, location) are processed alongside current market price data collected from public listing platforms for the purpose of asset valuation.
 
-c) Akademik Veriler
-Not ortalaması (GPA), öğrenci belgesi, burs ve başarı belgeleri, dil sertifikaları, araştırma faaliyetleri.
+c) Academic Data
+GPA, student transcript, scholarship and achievement certificates, language certificates, research activities.
 
-d) Liderlik ve Sosyal Etki Verileri
-Dernek/kulüp üyelikleri, gönüllülük faaliyetleri, girişimcilik deneyimi.
+d) Leadership & Social Impact Data
+Association/club memberships, volunteer activities, entrepreneurship experience.
 
-e) Yüklenen Belgeler — OCR ile İşlenen Veriler
-Yüklenen belgeler pdfplumber ve pytesseract kütüphaneleri kullanılarak optik karakter tanıma (OCR) işlemine tabi tutulmaktadır. Elde edilen veriler, formda beyan ettiğiniz bilgilerle çapraz doğrulama amacıyla kullanılmakta; her başvuru için 0–100 arasında bir güven puanı hesaplanmaktadır.
+e) Uploaded Documents — OCR-Processed Data
+Uploaded documents are processed via optical character recognition (OCR). The extracted data is used for cross-validation against form declarations; a trust score between 0–100 is calculated for each application.
 
-2. VERİLERİN İŞLENME AMAÇLARI
+2. PURPOSES OF DATA PROCESSING
 
-• Burs başvurusunun alınması, değerlendirilmesi ve sonuçlandırılması
-• Beyan edilen finansal varlıkların güncel piyasa verileriyle doğrulanması
-• Yüklenen belgeler ile form beyanlarının tutarlılığının denetlenmesi
-• Burs programına özgü ağırlıklı puanlama formülüne göre başvurunun puanlanması
-• Sistem yöneticileri tarafından aday sıralamasının görüntülenmesi
+• Receiving, evaluating, and concluding scholarship applications
+• Verifying declared financial assets against current market data
+• Auditing consistency between uploaded documents and form declarations
+• Scoring applications according to the scholarship's weighted formula
+• Displaying the ranked applicant list to system administrators
 
-3. VERİLERİN AKTARILACAĞI TARAFLAR
+3. DATA RECIPIENTS
 
-Sistem Yönetimi: Başvurunuz ve puan dökümünüz yalnızca PSDS sistem yöneticileri tarafından görüntülenebilir. Verileriniz herhangi bir burs sağlayıcısı, vakıf veya üçüncü taraf kurumla paylaşılmamaktadır.
+System Administration: Your application and score breakdown can only be viewed by BursIQ system administrators. Your data is not shared with any scholarship provider, foundation, or third-party institution.
 
-Anthropic Inc. — Yurt Dışı Aktarım (KVKK Madde 9): Finansal varlık değerleme sürecinde, beyan ettiğiniz araç veya taşınmaz özellikleri (marka, model, yıl, konum gibi) kamuya açık piyasa verileriyle birlikte Anthropic Inc. tarafından işletilen yapay zeka API'sine (Claude) iletilmektedir. Anthropic Inc. Amerika Birleşik Devletleri'nde yerleşik bir şirkettir; bu iletim KVKK'nın 9. maddesi kapsamında yurt dışına kişisel veri aktarımı niteliği taşımaktadır. Söz konusu aktarım yalnızca piyasa değeri tahmini amacıyla gerçekleştirilmekte olup adınız, kimlik numaranız ve iletişim bilgileriniz bu aktarıma dahil edilmemektedir.
+Anthropic Inc. (International Transfer): During the financial asset valuation process, declared vehicle or property attributes (brand, model, year, location) are sent alongside public market data to the AI API (Claude) operated by Anthropic Inc., a company based in the United States. This transfer is solely for the purpose of market value estimation; your name, ID number, and contact details are not included.
 
-Altyapı Hizmet Sağlayıcıları: Vercel (frontend barındırma) ve Render (backend barındırma) platformları teknik veri işleyici konumundadır; kişisel verilerinize bağımsız olarak erişemezler.
+Infrastructure Providers: Vercel (frontend hosting) and Render (backend hosting) act as technical data processors and cannot independently access your personal data.
 
-4. SAKLAMA SÜRESİ
+4. RETENTION PERIOD
 
-Kişisel verileriniz, burs değerlendirme sürecinin tamamlanmasından itibaren ilgili mevzuatta öngörülen süreler boyunca saklanacak; akabinde güvenli biçimde silinecek veya anonimleştirilecektir.
+Your personal data will be retained for the period required by applicable regulations following the completion of the scholarship evaluation process, after which it will be securely deleted or anonymised.
 
-5. KVKK KAPSAMINDAKİ HAKLARINIZ
+5. YOUR RIGHTS
 
-KVKK'nın 11. maddesi uyarınca: kişisel verilerinizin işlenip işlenmediğini öğrenme, işlenen verileriniz hakkında bilgi talep etme, verilerin işlenme amacını öğrenme, yurt içinde veya yurt dışında aktarıldığı üçüncü kişileri öğrenme, eksik veya yanlış işlenmiş verilerin düzeltilmesini isteme, KVKK'nın 7. maddesi çerçevesinde silinmesini ya da yok edilmesini isteme, otomatik sistemler aracılığıyla aleyhinize sonuç doğuran işlemlere itiraz etme ve kanuna aykırı işleme nedeniyle uğradığınız zararın giderilmesini talep etme haklarına sahipsiniz.
+You have the right to: learn whether your personal data is being processed, request information about processed data, learn the purposes of processing, learn third parties to whom data is transferred, request correction of incomplete or inaccurate data, request deletion or destruction of data, object to outcomes arising from automated processing, and request compensation for damages arising from unlawful processing.
 
-6. RIZANIN GERİ ALINMASI
+6. WITHDRAWAL OF CONSENT
 
-Açık rızanızı dilediğiniz zaman geri alabilirsiniz. Geri alma, önceki veri işleme faaliyetlerinin hukukiliğini etkilemez.
+You may withdraw your consent at any time. Withdrawal does not affect the lawfulness of prior data processing activities.
 
-PSDS — Kadir Has Üniversitesi, Yönetim Bilişim Sistemleri, 2025–2026
-Sude Yerekonmaz · Nora Mardikyan · Emre Karagac · Beyzanur Pala`
+BursIQ — Management Information Systems, 2025–2026`
 
 const CAR_BRANDS: Record<string, string[]> = {
   "Toyota":       ["Corolla", "Yaris", "Camry", "C-HR", "RAV4", "Land Cruiser", "Hilux", "Auris", "Prius", "Verso"],
@@ -308,13 +307,13 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       } else {
         setDocValidation(prev => ({
           ...prev,
-          [key]: { status: "unknown", message: "⚠️ Doğrulama servisi yanıt vermedi. Belge kabul edildi, manuel incelemeye alınacak.", visionUnavailable: true },
+          [key]: { status: "unknown", message: "⚠️ Validation service unavailable. Document accepted — will be reviewed manually.", visionUnavailable: true },
         }))
       }
     } catch {
       setDocValidation(prev => ({
         ...prev,
-        [key]: { status: "unknown", message: "⚠️ Doğrulama servisi yanıt vermedi. Belge kabul edildi ancak manuel incelemeye alınacak.", visionUnavailable: true },
+        [key]: { status: "unknown", message: "⚠️ Validation service unavailable. Document accepted — will be reviewed manually.", visionUnavailable: true },
       }))
     }
   }
@@ -415,8 +414,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       const isFetch = msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("network")
       setSubmitError(
         isFetch
-          ? "Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin."
-          : `Gönderim hatası: ${msg.slice(0, 200)}`
+          ? "Could not connect to the server. Please check your internet connection and try again."
+          : `Submission error: ${msg.slice(0, 200)}`
       )
     } finally {
       setLoading(false)
@@ -498,13 +497,13 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
         {step === 0 && (
           <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
-              <h2 className="font-black text-slate-800 text-lg">Kişisel Bilgiler</h2>
+              <h2 className="font-black text-slate-800 text-lg">Personal Information</h2>
 
               {/* Ad / Soyad */}
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { id: "first_name", label: "Ad", req: true },
-                  { id: "last_name",  label: "Soyad", req: true },
+                  { id: "first_name", label: "First Name", req: true },
+                  { id: "last_name",  label: "Last Name", req: true },
                 ].map(f => (
                   <div key={f.id}>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}{f.req && " *"}</label>
@@ -517,7 +516,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
 
               {/* TC Kimlik */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">TC Kimlik No *</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">National ID No *</label>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -530,19 +529,19 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                         ? "border-emerald-400"
                         : "border-red-300"
                       : "border-slate-200"}`}
-                  placeholder="11 haneli TC kimlik numarası"
+                  placeholder="11-digit national ID number"
                 />
                 {values["tc_no"] && values["tc_no"].length !== 11 && (
                   <p className="text-xs text-red-500 font-medium mt-1">
-                    ❌ TC kimlik numarası 11 haneli olmalıdır ({values["tc_no"].length}/11)
+                    ❌ National ID must be 11 digits ({values["tc_no"].length}/11)
                   </p>
                 )}
               </div>
 
               {/* Diğer alanlar */}
               {[
-                { id: "birth_date", label: "Doğum Tarihi",  type: "date" },
-                { id: "phone",      label: "Telefon",        type: "tel" },
+                { id: "birth_date", label: "Date of Birth", type: "date" },
+                { id: "phone",      label: "Phone",          type: "tel" },
               ].map(f => (
                 <div key={f.id}>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}</label>
@@ -554,7 +553,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
 
               {/* Email — format kontrolü */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">E-posta *</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Email *</label>
                 <input
                   type="email"
                   value={values["email"] || ""}
@@ -568,16 +567,16 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                       : "border-slate-200"}`}
                 />
                 {values["email"] && !values["email"].includes("@") && (
-                  <p className="text-xs text-red-500 font-medium mt-1">❌ @ işareti zorunlu (örn: ornek@gmail.com)</p>
+                  <p className="text-xs text-red-500 font-medium mt-1">❌ @ symbol required (e.g. example@gmail.com)</p>
                 )}
                 {values["email"] && values["email"].includes("@") && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(values["email"]) && (
-                  <p className="text-xs text-red-500 font-medium mt-1">❌ Geçerli domain girin (örn: @gmail.com)</p>
+                  <p className="text-xs text-red-500 font-medium mt-1">❌ Enter a valid domain (e.g. @gmail.com)</p>
                 )}
               </div>
 
               {[
-                { id: "university", label: "Üniversite", type: "text" },
-                { id: "department", label: "Bölüm",      type: "text" },
+                { id: "university", label: "University", type: "text" },
+                { id: "department", label: "Department", type: "text" },
               ].map(f => (
                 <div key={f.id}>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}</label>
@@ -612,14 +611,14 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-slate-700 text-sm flex items-center gap-2">
-                  <span>🔒</span> Kişisel Verilerin Korunması (KVKK)
+                  <span>🔒</span> Data Privacy Consent
                 </h3>
                 <button
                   type="button"
                   onClick={() => setKvkkOpen(v => !v)}
                   className="text-xs text-indigo-600 font-semibold hover:underline"
                 >
-                  {kvkkOpen ? "Gizle ▲" : "Metni Oku ▼"}
+                  {kvkkOpen ? "Hide ▲" : "Read Policy ▼"}
                 </button>
               </div>
 
@@ -637,14 +636,14 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                   className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
                 />
                 <span className="text-xs text-slate-600 leading-snug">
-                  Yukarıdaki bilgilendirmeyi okuduğumu ve anladığımı; kişisel verilerimin açıklanan amaçlar ve kapsam dahilinde işlenmesine,{" "}
-                  <span className="font-semibold">Anthropic Inc.'e yurt dışı aktarım dahil olmak üzere</span>, özgür irademle rıza verdiğimi beyan ederim.
+                  I confirm that I have read and understood the above notice and freely consent to the processing of my personal data for the stated purposes,{" "}
+                  <span className="font-semibold">including international transfer to Anthropic Inc.</span>
                 </span>
               </label>
 
               {!kvkkAccepted && (
                 <p className="text-xs text-amber-600 font-medium">
-                  ⚠️ Devam edebilmek için KVKK aydınlatma metnini onaylamanız gerekmektedir.
+                  ⚠️ You must accept the data privacy notice to continue.
                 </p>
               )}
             </div>
@@ -658,7 +657,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               }
               className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Devam Et →
+              Continue →
             </button>
           </div>
         )}
@@ -742,7 +741,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                         step={values["gpa_system"] === "4" ? 0.01 : 1}
                         placeholder={
                           !values["gpa_system"]
-                            ? "Önce ölçeği seçin"
+                            ? "Select scale first"
                             : values["gpa_system"] === "4"
                               ? "0.00 – 4.00"
                               : "0 – 100"
@@ -819,7 +818,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
             {/* Cevaplanmayan sorular uyarısı */}
             {questions.some(q => !values[q.id]) && (
               <p className="text-xs text-red-500 font-medium">
-                ❗ Tüm soruları cevaplamanız gerekmektedir.
+                ❗ Please answer all required questions.
               </p>
             )}
 
@@ -880,21 +879,21 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                         status === "checking" ? (
                           <span className="flex items-center gap-1 text-xs text-amber-600 font-semibold">
                             <span className="w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                            Doğrulanıyor…
+                            Verifying…
                           </span>
                         ) : status === "valid" ? (
-                          <span className="text-xs text-emerald-600 font-semibold">✅ Geçerli</span>
+                          <span className="text-xs text-emerald-600 font-semibold">✅ Valid</span>
                         ) : status === "invalid" ? (
-                          <span className="text-xs text-red-600 font-semibold">❌ Geçersiz</span>
+                          <span className="text-xs text-red-600 font-semibold">❌ Invalid</span>
                         ) : (
-                          <span className="text-xs text-amber-600 font-semibold">⚠️ Doğrulanamadı</span>
+                          <span className="text-xs text-amber-600 font-semibold">⚠️ Unverified</span>
                         )
                       )}
                     </div>
                     {/* Transkript için notlama sistemi seçimi — yüklemeden önce seçin */}
                     {docId === "transcript_file" && (
                       <div className="mb-3 space-y-1">
-                        <p className="text-xs font-semibold text-slate-600">Notlama Sistemi (önce seçin):</p>
+                        <p className="text-xs font-semibold text-slate-600">Grading System (select first):</p>
                         <div className="flex gap-2">
                           {GPA_SYSTEM_OPTIONS.map(o => (
                             <button
@@ -915,7 +914,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                     )}
                     <label className="block cursor-pointer">
                       <div className={`border-2 border-dashed rounded-xl p-3 text-center text-xs transition ${fileCls}`}>
-                        {file ? file.name : "PDF seçmek için tıklayın"}
+                        {file ? file.name : "Click to select a PDF"}
                       </div>
                       <input type="file" accept=".pdf"
                         onChange={e => setFile(docId, e.target.files?.[0] || null)}
@@ -933,16 +932,16 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                     {/* Gelir belgesi — okunan net gelir göster */}
                     {file && status === "valid" && docId === "income_file" && docValidation[docId]?.netAylik && (
                       <p className="mt-2 text-xs font-semibold text-emerald-700">
-                        💰 Okunan aylık net: <strong>₺{Math.round(docValidation[docId].netAylik!).toLocaleString("tr-TR")}</strong>
-                        {" "}— gelir dilimi otomatik seçildi
+                        💰 Detected monthly net: <strong>₺{Math.round(docValidation[docId].netAylik!).toLocaleString("en")}</strong>
+                        {" "}— income bracket auto-selected
                       </p>
                     )}
 
                     {/* Transkript — okunan GNO göster */}
                     {file && status === "valid" && docId === "transcript_file" && values["gpa"] && (
                       <p className="mt-2 text-xs font-semibold text-emerald-700">
-                        📊 Okunan GNO: <strong>{values["gpa"]}</strong>
-                        {values["gpa_system"] ? ` (${values["gpa_system"] === "4" ? "4.0 sistemi" : "100'lük sistem"})` : ""}
+                        📊 Detected GPA: <strong>{values["gpa"]}</strong>
+                        {values["gpa_system"] ? ` (${values["gpa_system"] === "4" ? "4.0 scale" : "100 scale"})` : ""}
                       </p>
                     )}
 
@@ -950,24 +949,24 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                     {file && docId === "transcript_file" && docValidation[docId]?.nameMismatch === true && (
                       <div className="mt-2 bg-red-50 border border-red-200 rounded-xl p-3">
                         <p className="text-xs font-bold text-red-700 mb-0.5">
-                          ⚠️ İsim Uyuşmazlığı
+                          ⚠️ Name Mismatch
                         </p>
                         <p className="text-xs text-red-600 leading-snug">
-                          Transkriptteki isim (<strong>{docValidation[docId].transcriptName}</strong>) formda girdiğiniz isimle eşleşmiyor.
-                          Lütfen size ait bir transkript yükleyin.
+                          The name on the transcript (<strong>{docValidation[docId].transcriptName}</strong>) does not match the name you entered.
+                          Please upload your own transcript.
                         </p>
                       </div>
                     )}
                     {file && docId === "transcript_file" && docValidation[docId]?.nameMismatch === false && docValidation[docId]?.transcriptName && (
                       <p className="mt-1.5 text-xs text-emerald-700 font-medium">
-                        ✅ Transkript sahibi doğrulandı: <strong>{docValidation[docId].transcriptName}</strong>
+                        ✅ Transcript owner verified: <strong>{docValidation[docId].transcriptName}</strong>
                       </p>
                     )}
 
                     {/* Manuel giriş — Vision okuyamadığında veya servis erişilemediğinde */}
                     {file && status !== "checking" && status !== "invalid" && (dv?.visionUnavailable || status === "unknown") && docId === "car_file" && (
                       <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
-                        <p className="text-xs font-semibold text-amber-800">Araç bilgilerini girin (fiyat tahmini için):</p>
+                        <p className="text-xs font-semibold text-amber-800">Enter vehicle details (for price estimation):</p>
                         <div className="grid grid-cols-2 gap-2">
                           {/* Marka */}
                           <select
@@ -975,7 +974,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                             value={values["car_brand"] || ""}
                             onChange={e => setValues(p => ({ ...p, car_brand: e.target.value, car_model: "" }))}
                           >
-                            <option value="">— Marka seçin —</option>
+                            <option value="">— Select brand —</option>
                             {Object.keys(CAR_BRANDS).sort().map(b => (
                               <option key={b} value={b}>{b}</option>
                             ))}
@@ -987,7 +986,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                             disabled={!values["car_brand"]}
                             onChange={e => setValues(p => ({ ...p, car_model: e.target.value }))}
                           >
-                            <option value="">— Model seçin —</option>
+                            <option value="">— Select model —</option>
                             {(CAR_BRANDS[values["car_brand"] || ""] || []).map(m => (
                               <option key={m} value={m}>{m}</option>
                             ))}
@@ -998,7 +997,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                             value={values["car_year"] || ""}
                             onChange={e => setValues(p => ({ ...p, car_year: e.target.value }))}
                           >
-                            <option value="">— Yıl —</option>
+                            <option value="">— Year —</option>
                             {Array.from({ length: 30 }, (_, i) => 2025 - i).map(y => (
                               <option key={y} value={y}>{y}</option>
                             ))}
@@ -1009,8 +1008,8 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                             value={values["car_damage"] || "no"}
                             onChange={e => setValues(p => ({ ...p, car_damage: e.target.value }))}
                           >
-                            <option value="no">Hasar kaydı yok</option>
-                            <option value="yes">Hasar kaydı var</option>
+                            <option value="no">No damage record</option>
+                            <option value="yes">Has damage record</option>
                           </select>
                         </div>
                       </div>
@@ -1020,19 +1019,19 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                       <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
                         <p className="text-xs font-semibold text-amber-800">
                           {(dv?.visionUnavailable || status === "unknown")
-                            ? "Tapu bilgilerini manuel girin:"
-                            : "Tapudan okunan bilgiler (gerekirse düzeltin):"}
+                            ? "Enter property details manually:"
+                            : "Details read from title deed (correct if needed):"}
                         </p>
                         <div className="grid grid-cols-2 gap-2">
                           <input
                             className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
-                            placeholder="Şehir (ör. İstanbul)"
+                            placeholder="City (e.g. Istanbul)"
                             value={values["city"] || ""}
                             onChange={e => setValues(p => ({ ...p, city: e.target.value }))}
                           />
                           <input
                             className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
-                            placeholder="İlçe (ör. Kadıköy)"
+                            placeholder="District (e.g. Kadikoy)"
                             value={values["district"] || ""}
                             onChange={e => setValues(p => ({ ...p, district: e.target.value }))}
                           />
@@ -1051,30 +1050,30 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               })}
             </div>
 
-            {/* Geçersiz belge uyarısı — gönderimi engeller */}
+            {/* Invalid document warning — blocks submission */}
             {Object.values(docValidation).some(v => v.status === "invalid") && (
               <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-sm text-red-700 space-y-1">
-                <p className="font-bold">❌ Geçersiz belge tespit edildi</p>
-                <p>Lütfen kırmızı işaretli belgeleri kaldırıp doğru belgeyi yükleyin. Yanlış belgeyle başvuru gönderilemez.</p>
+                <p className="font-bold">❌ Invalid document detected</p>
+                <p>Please remove the documents marked in red and upload the correct ones. Submission is blocked until all documents are valid.</p>
               </div>
             )}
 
-            {/* Gönderim hatası */}
+            {/* Submission error */}
             {submitError && (
               <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 space-y-2">
-                <p className="text-sm font-bold text-red-700">❌ Başvuru gönderilemedi</p>
+                <p className="text-sm font-bold text-red-700">❌ Submission failed</p>
                 <p className="text-xs text-red-600">{submitError}</p>
                 <button
                   onClick={handleSubmit}
                   className="mt-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg"
                 >
-                  Tekrar Dene
+                  Retry
                 </button>
               </div>
             )}
 
             <div className="flex gap-3">
-              <button onClick={() => goStep(1)} className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm">← Geri</button>
+              <button onClick={() => goStep(1)} className="flex-1 rounded-xl bg-slate-100 text-slate-700 font-semibold py-3 text-sm">← Back</button>
               <button
                 onClick={handleSubmit}
                 disabled={
@@ -1088,13 +1087,13 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
                     <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Analiz ediliyor…
+                    Analyzing…
                   </span>
                 ) : Object.values(docValidation).some(v => v.status === "checking")
-                  ? "Belgeler kontrol ediliyor…"
+                  ? "Checking documents…"
                   : Object.values(docValidation).some(v => v.nameMismatch === true)
-                  ? "İsim uyuşmazlığı — başvuru gönderilemez"
-                  : "Başvuruyu Gönder →"}
+                  ? "Name mismatch — cannot submit"
+                  : "Submit Application →"}
               </button>
             </div>
           </div>
