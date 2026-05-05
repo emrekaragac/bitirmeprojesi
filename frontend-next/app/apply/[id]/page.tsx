@@ -556,18 +556,39 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                 )
               })()}
 
-              {/* Diğer alanlar */}
-              {[
-                { id: "birth_date", label: "Date of Birth", type: "date" },
-                { id: "phone",      label: "Phone",          type: "tel" },
-              ].map(f => (
-                <div key={f.id}>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}</label>
-                  <input type={f.type} value={values[f.id] || ""} onChange={e => setVal(f.id, e.target.value)}
-                    className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
-                      ${values[f.id] ? "border-indigo-300" : "border-slate-200"}`} />
-                </div>
-              ))}
+              {/* Date of Birth */}
+              {(() => {
+                const today = new Date().toISOString().split("T")[0]
+                const minDate = "1900-01-01"
+                const bd = values["birth_date"] || ""
+                const isFuture = bd && bd > today
+                const isTooOld = bd && bd < minDate
+                const bdOk = bd && !isFuture && !isTooOld
+                return (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Date of Birth</label>
+                    <input
+                      type="date"
+                      value={bd}
+                      max={today}
+                      min={minDate}
+                      onChange={e => setVal("birth_date", e.target.value)}
+                      className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
+                        ${!bd ? "border-slate-200" : bdOk ? "border-indigo-300" : "border-red-300"}`}
+                    />
+                    {isFuture && <p className="text-xs text-red-500 font-medium mt-1">❌ Date of birth cannot be in the future</p>}
+                    {isTooOld && <p className="text-xs text-red-500 font-medium mt-1">❌ Please enter a valid date of birth</p>}
+                  </div>
+                )
+              })()}
+
+              {/* Phone */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Phone</label>
+                <input type="tel" value={values["phone"] || ""} onChange={e => setVal("phone", e.target.value)}
+                  className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
+                    ${values["phone"] ? "border-indigo-300" : "border-slate-200"}`} />
+              </div>
 
               {/* Email — format kontrolü */}
               <div>
