@@ -22,7 +22,7 @@ const TYPE_BADGE: Record<string, { label: string; color: string }> = {
   both:      { label: "⚖️ Finansal + Akademik", color: "bg-indigo-100 text-indigo-700" },
 }
 
-function BursIQLogo({ size = 44 }: { size?: number }) {
+function ScholarShipLogo({ size = 44 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -75,7 +75,7 @@ function DeadlineBadge({ deadline }: { deadline: string }) {
   )
 }
 
-const CACHE_KEY = "bursiq_scholarships_v1"
+const CACHE_KEY = "scholarship_list_v1"
 const CACHE_TTL = 5 * 60 * 1000 // 5 dakika
 
 function SkeletonCard() {
@@ -155,10 +155,10 @@ export default function LandingPage() {
       {/* ── Top Bar ── */}
       <div className="flex items-center justify-between px-8 py-5 border-b border-indigo-100 bg-white/70 backdrop-blur sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <BursIQLogo size={44} />
+          <ScholarShipLogo size={44} />
           <div>
-            <span className="text-indigo-900 font-black text-xl tracking-tight leading-none block">BursIQ</span>
-            <span className="text-indigo-400 text-[11px] font-medium leading-none">Parametric Scholarship System</span>
+            <span className="text-indigo-900 font-black text-xl tracking-tight leading-none block">ScholarShip</span>
+            <span className="text-indigo-400 text-[11px] font-medium leading-none">AI-Powered Scholarship Platform</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -332,8 +332,8 @@ export default function LandingPage() {
         <div className="max-w-3xl mx-auto px-6 py-12 grid sm:grid-cols-3 gap-8">
           <div className="sm:col-span-1">
             <div className="flex items-center gap-2 mb-3">
-              <BursIQLogo size={32} />
-              <span className="font-black text-indigo-900 text-base">BursIQ</span>
+              <ScholarShipLogo size={32} />
+              <span className="font-black text-indigo-900 text-base">ScholarShip</span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
               Parametric Scholarship Distribution System — AI-powered, transparent, and fair.
@@ -360,7 +360,7 @@ export default function LandingPage() {
             <ul className="space-y-2">
               <li className="flex items-center gap-2 text-sm text-slate-500">
                 <span className="text-base">✉️</span>
-                <a href="mailto:bursiq@gmail.com" className="hover:text-indigo-600 transition">bursiq@gmail.com</a>
+                <a href="mailto:scholarship@gmail.com" className="hover:text-indigo-600 transition">scholarship@gmail.com</a>
               </li>
               <li className="flex items-center gap-2 text-sm text-slate-500">
                 <span className="text-base">🏛️</span>
@@ -376,7 +376,7 @@ export default function LandingPage() {
 
         {/* Bottom bar */}
         <div className="border-t border-indigo-50 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-xs text-slate-400">© 2025 BursIQ — Parametric Scholarship Distribution System</p>
+          <p className="text-xs text-slate-400">© 2025 ScholarShip — Parametric Scholarship Distribution System</p>
           <p className="text-xs text-slate-400">Academic Year 2025–2026</p>
         </div>
       </footer>

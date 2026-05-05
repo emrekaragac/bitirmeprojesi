@@ -65,9 +65,9 @@ const LANG_OPTIONS = [
 ]
 
 // ── KVKK Metni ──────────────────────────────────────────────
-const KVKK_TEXT = `BursIQ — Data Processing Consent
+const KVKK_TEXT = `ScholarShip — Data Processing Consent
 
-Data Controller: Parametric Scholarship Distribution System (BursIQ)
+Data Controller: Parametric Scholarship Distribution System (ScholarShip)
 Scope: All personal data processed within the scope of the scholarship application
 Legal Basis: Personal data protection regulations applicable to academic research systems
 
@@ -98,7 +98,7 @@ Uploaded documents are processed via optical character recognition (OCR). The ex
 
 3. DATA RECIPIENTS
 
-System Administration: Your application and score breakdown can only be viewed by BursIQ system administrators. Your data is not shared with any scholarship provider, foundation, or third-party institution.
+System Administration: Your application and score breakdown can only be viewed by ScholarShip system administrators. Your data is not shared with any scholarship provider, foundation, or third-party institution.
 
 Anthropic Inc. (International Transfer): During the financial asset valuation process, declared vehicle or property attributes (brand, model, year, location) are sent alongside public market data to the AI API (Claude) operated by Anthropic Inc., a company based in the United States. This transfer is solely for the purpose of market value estimation; your name, ID number, and contact details are not included.
 
@@ -116,7 +116,7 @@ You have the right to: learn whether your personal data is being processed, requ
 
 You may withdraw your consent at any time. Withdrawal does not affect the lawfulness of prior data processing activities.
 
-BursIQ — Management Information Systems, 2025–2026`
+ScholarShip — Management Information Systems, 2025–2026`
 
 const CAR_BRANDS: Record<string, string[]> = {
   "Toyota":       ["Corolla", "Yaris", "Camry", "C-HR", "RAV4", "Land Cruiser", "Hilux", "Auris", "Prius", "Verso"],
@@ -696,7 +696,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                       <span className="text-lg">🔒</span>
                       <div>
                         <p className="font-black text-slate-800 text-sm">Data Processing Notice</p>
-                        <p className="text-xs text-slate-400">BursIQ · 2025–2026</p>
+                        <p className="text-xs text-slate-400">ScholarShip · 2025–2026</p>
                       </div>
                     </div>
                     <button
@@ -712,7 +712,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                   <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5 text-sm text-slate-700 leading-relaxed">
                     <div>
                       <p className="text-xs text-slate-400 mb-1">Data Controller</p>
-                      <p className="font-semibold">Parametric Scholarship Distribution System (BursIQ)</p>
+                      <p className="font-semibold">Parametric Scholarship Distribution System (ScholarShip)</p>
                     </div>
 
                     {[
@@ -755,7 +755,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                       <div className="space-y-2 text-xs">
                         <div className="bg-slate-50 rounded-xl p-3">
                           <p className="font-semibold text-slate-700 mb-0.5">System Administrators</p>
-                          <p className="text-slate-500">Your application and score breakdown are only accessible to BursIQ administrators. Data is not shared with any scholarship provider or third party.</p>
+                          <p className="text-slate-500">Your application and score breakdown are only accessible to ScholarShip administrators. Data is not shared with any scholarship provider or third party.</p>
                         </div>
                         <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
                           <p className="font-semibold text-amber-800 mb-0.5">⚠️ Anthropic Inc. (International Transfer)</p>
