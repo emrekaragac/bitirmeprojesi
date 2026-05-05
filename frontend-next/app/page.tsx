@@ -54,15 +54,15 @@ function BursIQLogo({ size = 44 }: { size?: number }) {
 
 function deadlineInfo(deadline: string) {
   const days = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000)
-  if (days < 0)   return { label: "Süresi doldu",   color: "text-red-400",    urgent: false, pulse: false }
-  if (days === 0) return { label: "🔥 Bugün son gün!", color: "text-red-500", urgent: true,  pulse: true  }
-  if (days === 1) return { label: "😱 Yarın bitiyor!", color: "text-red-500", urgent: true,  pulse: true  }
-  if (days === 2) return { label: "⚡ Son 2 gün!",    color: "text-orange-500", urgent: true,  pulse: false }
-  if (days === 3) return { label: "⏳ Son 3 gün!",    color: "text-orange-500", urgent: true,  pulse: false }
-  if (days <= 7)  return { label: `⏰ ${days} gün kaldı`, color: "text-amber-600", urgent: false, pulse: false }
+  if (days < 0)   return { label: "Expired",         color: "text-red-400",    urgent: false, pulse: false }
+  if (days === 0) return { label: "🔥 Last day!",     color: "text-red-500",    urgent: true,  pulse: true  }
+  if (days === 1) return { label: "😱 Ends tomorrow!", color: "text-red-500",   urgent: true,  pulse: true  }
+  if (days === 2) return { label: "⚡ 2 days left!",   color: "text-orange-500", urgent: true,  pulse: false }
+  if (days === 3) return { label: "⏳ 3 days left!",   color: "text-orange-500", urgent: true,  pulse: false }
+  if (days <= 7)  return { label: `⏰ ${days} days left`, color: "text-amber-600", urgent: false, pulse: false }
   const d = new Date(deadline)
-  const fmt = d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })
-  return { label: `📅 ${fmt}`, color: "text-slate-400", urgent: false, pulse: false }
+  const fmt = d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+  return { label: `⏳ ${fmt}`, color: "text-slate-400", urgent: false, pulse: false }
 }
 
 function DeadlineBadge({ deadline }: { deadline: string }) {
@@ -158,13 +158,13 @@ export default function LandingPage() {
           <BursIQLogo size={44} />
           <div>
             <span className="text-indigo-900 font-black text-xl tracking-tight leading-none block">BursIQ</span>
-            <span className="text-indigo-400 text-[11px] font-medium leading-none">Parametrik Burs Sistemi</span>
+            <span className="text-indigo-400 text-[11px] font-medium leading-none">Parametric Scholarship System</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <a href="/setup"
             className="text-sm bg-indigo-600 hover:bg-indigo-700 transition text-white px-4 py-2 rounded-xl font-semibold shadow-sm shadow-indigo-200">
-            + Burs Oluştur
+            + Create Scholarship
           </a>
           <a href="/admin" className="text-sm text-indigo-500 hover:text-indigo-800 transition font-semibold">
             Admin →
@@ -174,25 +174,22 @@ export default function LandingPage() {
 
       {/* ── Hero ── */}
       <div className="text-center px-4 pt-16 pb-12">
-        <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-700 text-sm font-semibold px-4 py-1.5 rounded-full mb-6">
-          🎓 Türkiye&apos;nin Akıllı Burs Platformu
-        </div>
         <h1 className="text-5xl sm:text-6xl font-black text-indigo-950 mb-4 leading-tight tracking-tight">
-          Bursunu{" "}
+          Find &amp;{" "}
           <span className="bg-gradient-to-r from-indigo-500 to-violet-500 bg-clip-text text-transparent">
-            Bul & Başvur
+            Apply for Scholarships
           </span>
         </h1>
         <p className="text-slate-500 text-lg max-w-lg mx-auto leading-relaxed">
-          Açık burs programlarına göz at, hemen başvur. Her bursun kendi kriterleri ve puanlama sistemi var.
+          Browse open scholarship programs and apply in minutes. Each scholarship has its own criteria and scoring system.
         </p>
 
         {/* Stats row */}
         <div className="flex items-center justify-center gap-8 mt-10">
           {[
-            { n: activeScholarships.length, label: "Aktif Burs" },
-            { n: "AI", label: "Destekli Analiz" },
-            { n: "100%", label: "Şeffaf Puanlama" },
+            { n: activeScholarships.length, label: "Active Scholarships" },
+            { n: "AI", label: "Powered Analysis" },
+            { n: "100%", label: "Transparent Scoring" },
           ].map(({ n, label }) => (
             <div key={label} className="text-center">
               <div className="text-2xl font-black text-indigo-700">{n}</div>
@@ -208,7 +205,7 @@ export default function LandingPage() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Burs ara…"
+            placeholder="Search scholarships…"
             className="flex-1 rounded-2xl bg-white border border-indigo-100 text-slate-800 placeholder-slate-400 px-5 py-3.5 text-base outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm"
           />
           <div className="flex gap-2">
@@ -222,7 +219,7 @@ export default function LandingPage() {
                     : "bg-white text-slate-600 hover:bg-indigo-50 border border-indigo-100"
                 }`}
               >
-                {f === "all" ? "Hepsi" : f === "both" ? "İkisi" : f === "financial" ? "Finansal" : "Akademik"}
+                {f === "all" ? "All" : f === "both" ? "Both" : f === "financial" ? "Financial" : "Academic"}
               </button>
             ))}
           </div>
@@ -236,7 +233,7 @@ export default function LandingPage() {
             {slowLoad && (
               <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl text-sm text-amber-700 font-medium mb-2">
                 <span className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin shrink-0" />
-                Sunucu uyandırılıyor, ilk açılış biraz sürebilir…
+                Waking up server, first load may take a moment…
               </div>
             )}
             <SkeletonCard /><SkeletonCard /><SkeletonCard />
@@ -244,30 +241,30 @@ export default function LandingPage() {
         ) : fetchError && scholarships.length === 0 ? (
           <div className="text-center py-24">
             <div className="text-5xl mb-4">⚠️</div>
-            <p className="text-red-500 font-semibold mb-1">Sunucuya ulaşılamadı.</p>
+            <p className="text-red-500 font-semibold mb-1">Could not reach the server.</p>
             <p className="text-slate-400 text-sm font-mono mb-4">{fetchError}</p>
             <button
               onClick={() => { setFetchError(null); setLoading(true); fetch(`${API}/scholarships`).then(r=>r.json()).then(d=>{setScholarships(Array.isArray(d)?d:[])}).catch(e=>setFetchError(String(e))).finally(()=>setLoading(false)) }}
               className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700"
-            >Tekrar Dene</button>
+            >Retry</button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-24">
             <div className="text-5xl mb-4">{activeScholarships.length === 0 ? "📭" : "🔍"}</div>
             {activeScholarships.length === 0 ? (
               <>
-                <p className="text-slate-500 font-medium mb-3">Henüz burs eklenmemiş.</p>
+                <p className="text-slate-500 font-medium mb-3">No scholarships added yet.</p>
                 <a href="/setup" className="text-indigo-600 hover:text-indigo-800 font-bold underline">
-                  İlk bursu oluştur →
+                  Create the first scholarship →
                 </a>
               </>
             ) : (
-              <p className="text-slate-500 font-medium">Arama kriterlerine uyan burs bulunamadı.</p>
+              <p className="text-slate-500 font-medium">No scholarships match your search.</p>
             )}
           </div>
         ) : (
           <div className="space-y-4 pb-16">
-            <p className="text-slate-400 text-sm font-medium px-1">{filtered.length} burs mevcut</p>
+            <p className="text-slate-400 text-sm font-medium px-1">{filtered.length} scholarship{filtered.length !== 1 ? "s" : ""} available</p>
 
             {filtered.map(s => {
               const badge = TYPE_BADGE[s.type] || { label: s.type, color: "bg-slate-100 text-slate-600" }
@@ -293,12 +290,12 @@ export default function LandingPage() {
                         </span>
                         {s.type === "both" && (
                           <span className="text-xs text-slate-400 font-medium">
-                            {s.financial_weight}% Finansal · {s.academic_weight}% Akademik
+                            {s.financial_weight}% Financial · {s.academic_weight}% Academic
                           </span>
                         )}
                         {isClosed && (
                           <span className="text-xs bg-red-100 text-red-500 px-2.5 py-1 rounded-full font-bold">
-                            Kapalı
+                            Closed
                           </span>
                         )}
                       </div>
@@ -331,7 +328,7 @@ export default function LandingPage() {
 
       {/* ── Footer ── */}
       <div className="text-center py-6 text-slate-400 text-sm border-t border-indigo-100 mt-4">
-        BursIQ © 2025 — Parametrik Burs Dağıtım Sistemi
+        BursIQ © 2025 — Parametric Scholarship Distribution System
       </div>
     </div>
   )
