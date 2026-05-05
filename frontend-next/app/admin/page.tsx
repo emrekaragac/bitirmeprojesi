@@ -416,21 +416,32 @@ export default function AdminPage() {
               <div>
                 <h3 className="font-bold text-slate-700 text-sm mb-3">Score Breakdown</h3>
                 <div className="space-y-1.5">
-                  {Object.entries(detail.scores.breakdown || {}).map(([k, v]) => (
-                    <div key={k} className="flex justify-between text-xs">
-                      <span className="text-slate-400 capitalize">{k.replace(/_/g, " ")}</span>
-                      <span className={`font-bold ${Number(v) < 0 ? "text-red-500" : "text-indigo-700"}`}>
-                        {Number(v) > 0 ? `+${v}` : v}
-                      </span>
-                    </div>
-                  ))}
+                  {Object.entries(detail.scores?.breakdown || {}).map(([k, v]) => {
+                    const isObj = typeof v === "object" && v !== null
+                    const pts = isObj ? (v as {points?: number; score?: number}).points ?? (v as {score?: number}).score ?? 0 : Number(v)
+                    const ans = isObj ? (v as {answer?: string}).answer : undefined
+                    const w   = isObj ? (v as {weight?: number}).weight : undefined
+                    return (
+                      <div key={k} className="flex justify-between text-xs">
+                        <span className="text-slate-400 capitalize">{k.replace(/_/g, " ")}</span>
+                        <div className="text-right">
+                          <span className={`font-bold ${pts < 0 ? "text-red-500" : "text-indigo-700"}`}>
+                            {pts > 0 ? `+${pts}` : pts} pts
+                          </span>
+                          {ans !== undefined && (
+                            <span className="ml-1.5 text-slate-400">({ans}{w !== undefined ? `, w:${w}%` : ""})</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
 
               <div>
                 <h3 className="font-bold text-slate-700 text-sm mb-3">Evaluation Notes</h3>
                 <ul className="space-y-1">
-                  {(detail.scores.reasons || []).map((r, i) => (
+                  {(detail.scores?.reasons || []).map((r, i) => (
                     <li key={i} className="text-xs text-slate-600 flex gap-2">
                       <span className="text-indigo-400 shrink-0">•</span>{r}
                     </li>
