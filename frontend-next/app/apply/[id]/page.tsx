@@ -890,7 +890,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                         )
                       )}
                     </div>
-                    {/* Transkript için notlama sistemi seçimi — yüklemeden önce seçin */}
+                    {/* Grading system selector for transcript — pick before uploading */}
                     {docId === "transcript_file" && (
                       <div className="mb-3 space-y-1">
                         <p className="text-xs font-semibold text-slate-600">Grading System (select first):</p>
@@ -912,14 +912,35 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                         </div>
                       </div>
                     )}
-                    <label className="block cursor-pointer">
-                      <div className={`border-2 border-dashed rounded-xl p-3 text-center text-xs transition ${fileCls}`}>
-                        {file ? file.name : "Click to select a PDF"}
+                    {file ? (
+                      <div className={`border-2 border-dashed rounded-xl px-3 py-2.5 flex items-center gap-2 ${fileCls}`}>
+                        <span className="flex-1 text-xs text-slate-700 truncate min-w-0">{file.name}</span>
+                        <label className="cursor-pointer shrink-0">
+                          <span className="text-xs text-indigo-600 font-semibold hover:text-indigo-800 whitespace-nowrap px-2 py-1 rounded-lg hover:bg-indigo-50 transition">
+                            🔄 Change
+                          </span>
+                          <input type="file" accept=".pdf"
+                            onChange={e => setFile(docId, e.target.files?.[0] || null)}
+                            className="hidden" />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setFile(docId, null)}
+                          className="shrink-0 text-xs text-red-500 font-semibold hover:text-red-700 whitespace-nowrap px-2 py-1 rounded-lg hover:bg-red-50 transition"
+                        >
+                          🗑 Remove
+                        </button>
                       </div>
-                      <input type="file" accept=".pdf"
-                        onChange={e => setFile(docId, e.target.files?.[0] || null)}
-                        className="hidden" />
-                    </label>
+                    ) : (
+                      <label className="block cursor-pointer">
+                        <div className={`border-2 border-dashed rounded-xl p-3 text-center text-xs transition ${fileCls}`}>
+                          Click to select a PDF
+                        </div>
+                        <input type="file" accept=".pdf"
+                          onChange={e => setFile(docId, e.target.files?.[0] || null)}
+                          className="hidden" />
+                      </label>
+                    )}
                     {file && status !== "checking" && dv?.message && (
                       <p className={`mt-2 text-xs font-medium leading-snug
                         ${status === "valid" ? "text-emerald-700"
@@ -1037,7 +1058,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                           />
                           <input
                             className="col-span-2 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
-                            placeholder="Alan (m²) ör. 95"
+                            placeholder="Area (m²) e.g. 95"
                             type="number"
                             value={values["square_meters"] || ""}
                             onChange={e => setValues(p => ({ ...p, square_meters: e.target.value }))}
