@@ -508,7 +508,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                   <div key={f.id}>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}{f.req && " *"}</label>
                     <input value={values[f.id] || ""} onChange={e => setVal(f.id, e.target.value)}
-                      className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
+                      className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
                         ${values[f.id] ? "border-indigo-300" : "border-slate-200"}`} />
                   </div>
                 ))}
@@ -523,7 +523,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                   maxLength={11}
                   value={values["tc_no"] || ""}
                   onChange={e => setVal("tc_no", e.target.value.replace(/\D/g, "").slice(0, 11))}
-                  className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
+                  className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
                     ${values["tc_no"]
                       ? values["tc_no"].length === 11
                         ? "border-emerald-400"
@@ -546,7 +546,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                 <div key={f.id}>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}</label>
                   <input type={f.type} value={values[f.id] || ""} onChange={e => setVal(f.id, e.target.value)}
-                    className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
+                    className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
                       ${values[f.id] ? "border-indigo-300" : "border-slate-200"}`} />
                 </div>
               ))}
@@ -559,7 +559,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                   value={values["email"] || ""}
                   onChange={e => setVal("email", e.target.value)}
                   placeholder="ornek@gmail.com"
-                  className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
+                  className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
                     ${values["email"]
                       ? /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(values["email"])
                         ? "border-emerald-400"
@@ -581,14 +581,14 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                 <div key={f.id}>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}</label>
                   <input type={f.type} value={values[f.id] || ""} onChange={e => setVal(f.id, e.target.value)}
-                    className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
+                    className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
                       ${values[f.id] ? "border-indigo-300" : "border-slate-200"}`} />
                 </div>
               ))}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Grade / Year</label>
                 <select value={values.grade || ""} onChange={e => setVal("grade", e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                  className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400 bg-white ${values.grade ? "border-indigo-300" : "border-slate-200"}`}>
                   <option value="">Select…</option>
                   {["1","2","3","4","5"].map(g => <option key={g} value={g}>Year {g}</option>)}
                 </select>
@@ -692,7 +692,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
 
                   {q.type === "select" && (
                     <select value={values[q.id] || ""} onChange={e => setVal(q.id, e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                      className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400 bg-white ${values[q.id] ? "border-indigo-300" : "border-slate-200"}`}>
                       <option value="">Select…</option>
                       {q.id === "monthly_income" && INCOME_OPTIONS.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
                       {q.id === "gpa_system" && GPA_SYSTEM_OPTIONS.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
@@ -708,7 +708,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                       value={values[q.id] || ""}
                       onChange={e => setVal(q.id, e.target.value)}
                       placeholder={q.type === "number" ? "0" : ""}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400"
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400"
                     />
                   )}
 
@@ -755,7 +755,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                           const maxVal = values["gpa_system"] === "4" ? 4 : 100
                           setVal(q.id, String(Math.min(Math.max(num, 0), maxVal)))
                         }}
-                        className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed
+                        className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed
                           ${values["gpa_system"] ? "border-indigo-300" : "border-slate-200"}`}
                       />
                       {values["gpa_system"] && values[q.id] && (
@@ -991,7 +991,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                         <div className="grid grid-cols-2 gap-2">
                           {/* Marka */}
                           <select
-                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            className="col-span-1 px-2 py-1.5 text-xs font-semibold text-slate-900 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
                             value={values["car_brand"] || ""}
                             onChange={e => setValues(p => ({ ...p, car_brand: e.target.value, car_model: "" }))}
                           >
@@ -1000,9 +1000,9 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                               <option key={b} value={b}>{b}</option>
                             ))}
                           </select>
-                          {/* Model — markaya göre dinamik */}
+                          {/* Model — dynamic by brand */}
                           <select
-                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 disabled:opacity-40"
+                            className="col-span-1 px-2 py-1.5 text-xs font-semibold text-slate-900 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 disabled:opacity-40"
                             value={values["car_model"] || ""}
                             disabled={!values["car_brand"]}
                             onChange={e => setValues(p => ({ ...p, car_model: e.target.value }))}
@@ -1012,9 +1012,9 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                               <option key={m} value={m}>{m}</option>
                             ))}
                           </select>
-                          {/* Yıl */}
+                          {/* Year */}
                           <select
-                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            className="col-span-1 px-2 py-1.5 text-xs font-semibold text-slate-900 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
                             value={values["car_year"] || ""}
                             onChange={e => setValues(p => ({ ...p, car_year: e.target.value }))}
                           >
@@ -1023,9 +1023,9 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                               <option key={y} value={y}>{y}</option>
                             ))}
                           </select>
-                          {/* Hasar */}
+                          {/* Damage */}
                           <select
-                            className="col-span-1 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            className="col-span-1 px-2 py-1.5 text-xs font-semibold text-slate-900 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
                             value={values["car_damage"] || "no"}
                             onChange={e => setValues(p => ({ ...p, car_damage: e.target.value }))}
                           >
