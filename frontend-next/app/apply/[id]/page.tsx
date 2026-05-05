@@ -1267,109 +1267,53 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
           </div>
         )}
 
-        {/* ── Step 3: Result ── */}
+        {/* ── Step 3: Confirmation ── */}
         {step === 3 && result && (
-          <div className="space-y-5">
-            {/* Score hero */}
-            <div className={`rounded-2xl border-2 p-6 ${PRIORITY_STYLE[result.priority] || "bg-slate-50 border-slate-200"}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest opacity-70">Your Score</p>
-                  <div className="text-6xl font-black">{result.score}<span className="text-2xl font-light opacity-50">/100</span></div>
+          <div className="space-y-5 text-center py-4">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-4xl">
+                ✅
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-800 mb-1">Application Submitted!</h2>
+                <p className="text-slate-500 text-sm max-w-xs mx-auto leading-relaxed">
+                  Your application has been received and is now under review. You will be notified of the outcome.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 text-left space-y-2">
+              <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide">Application Summary</p>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Applicant</span>
+                <span className="font-semibold text-slate-800">{values.first_name} {values.last_name}</span>
+              </div>
+              {values.university && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">University</span>
+                  <span className="font-semibold text-slate-800">{values.university}</span>
                 </div>
-                <div className="text-right">
-                  <div className={`px-4 py-2 rounded-xl text-sm font-black ${DECISION_STYLE[result.decision] || ""}`}>
-                    {result.decision}
-                  </div>
-                  <p className="text-xs mt-1 opacity-70">{result.priority}</p>
-                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Application ID</span>
+                <span className="font-bold text-indigo-700">#{result.application_id}</span>
               </div>
-              <div className="w-full bg-white/50 rounded-full h-3">
-                <div
-                  className={`h-3 rounded-full transition-all duration-700 ${
-                    result.score >= 75 ? "bg-red-500" : result.score >= 50 ? "bg-amber-500" : "bg-emerald-500"
-                  }`}
-                  style={{ width: `${result.score}%` }}
-                />
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Status</span>
+                <span className="font-semibold text-amber-600">Under Review</span>
               </div>
             </div>
 
-            {/* Score Breakdown */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-              <h3 className="font-bold text-slate-700 mb-4">Score Breakdown</h3>
-              <div className="space-y-3">
-                {Object.entries(result.breakdown || {}).map(([key, val]) => {
-                  // Parametric scoring returns objects; legacy scoring returns numbers
-                  const isObj = typeof val === "object" && val !== null
-                  const points = isObj ? (val as { points: number }).points : Number(val)
-                  const score  = isObj ? (val as { score: number }).score  : Number(val)
-                  const answer = isObj ? (val as { answer: string }).answer : undefined
-                  const weight = isObj ? (val as { weight: number }).weight : undefined
-                  const barPct = isObj
-                    ? Math.min(Math.abs(score), 100)
-                    : Math.min(Math.abs(points) * 3, 100)
-                  return (
-                    <div key={key}>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-slate-500 capitalize">{key.replace(/_/g, " ")}</span>
-                        <div className="text-right">
-                          <span className={`font-bold ${points < 0 ? "text-red-500" : "text-indigo-600"}`}>
-                            {points > 0 ? `+${points}` : points} pts
-                          </span>
-                          {answer !== undefined && (
-                            <span className="ml-2 text-slate-400">({answer}{weight !== undefined ? `, w:${weight}%` : ""})</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="w-full bg-slate-100 rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full ${points < 0 ? "bg-red-400" : "bg-indigo-500"}`}
-                          style={{ width: `${isNaN(barPct) ? 0 : barPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+            <p className="text-xs text-slate-400 px-4">
+              Please note your Application ID <strong className="text-slate-600">#{result.application_id}</strong> for future reference. Results are communicated through the scholarship provider.
+            </p>
 
-            {/* Valuation Cards */}
-            {(result.estimated_car_value || result.property_estimated_value) && (
-              <div className="grid grid-cols-2 gap-4">
-                {result.estimated_car_value && (
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-center">
-                    <div className="text-2xl mb-1">🚗</div>
-                    <p className="text-xs text-slate-400 mb-1">Est. Car Value</p>
-                    <p className="font-black text-indigo-700 text-sm">{fmt(result.estimated_car_value)}</p>
-                  </div>
-                )}
-                {result.property_estimated_value && (
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-center">
-                    <div className="text-2xl mb-1">🏠</div>
-                    <p className="text-xs text-slate-400 mb-1">Est. Property Value</p>
-                    <p className="font-black text-indigo-700 text-sm">{fmt(result.property_estimated_value)}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Evaluation Notes */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-              <h3 className="font-bold text-slate-700 mb-4">Evaluation Notes</h3>
-              <ul className="space-y-2">
-                {(result.reasons || []).map((r, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-slate-600">
-                    <span className="text-indigo-400 shrink-0 mt-0.5">•</span>{r}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-center text-xs text-indigo-600">
-              Application ID: <span className="font-bold">#{result.application_id}</span> — Keep this for your records
-            </div>
-
-            <a href="/" className="block text-center text-sm text-slate-400 hover:text-slate-600">← Back to Home</a>
+            <a
+              href="/"
+              className="block w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-3 text-sm text-center"
+            >
+              ← Back to Home
+            </a>
           </div>
         )}
       </div>
