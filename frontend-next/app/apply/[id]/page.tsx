@@ -168,6 +168,19 @@ const DECISION_STYLE: Record<string, string> = {
   "Rejected":     "text-red-700 bg-red-100",
 }
 
+function validateTC(tc: string): { ok: boolean; error?: string } {
+  if (tc.length !== 11)       return { ok: false, error: `Must be 11 digits (${tc.length}/11)` }
+  if (tc[0] === "0")          return { ok: false, error: "First digit cannot be 0" }
+  if (!/^\d{11}$/.test(tc))   return { ok: false, error: "Only digits allowed" }
+  const d = tc.split("").map(Number)
+  const d10 = (d[0]+d[2]+d[4]+d[6]+d[8]) * 7 - (d[1]+d[3]+d[5]+d[7])
+  if (((d10 % 10) + 10) % 10 !== d[9]) return { ok: false, error: "Invalid ID (checksum digit 10 failed)" }
+  const d11 = d.slice(0, 10).reduce((a, b) => a + b, 0) % 10
+  if (d11 !== d[10])          return { ok: false, error: "Invalid ID (checksum digit 11 failed)" }
+  if (d[10] % 2 !== 0)        return { ok: false, error: "Invalid ID (last digit must be even)" }
+  return { ok: true }
+}
+
 function fmt(v?: number | null) {
   if (v == null) return "—"
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(v)
@@ -515,28 +528,33 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               </div>
 
               {/* TC Kimlik */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">National ID No *</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={11}
-                  value={values["tc_no"] || ""}
-                  onChange={e => setVal("tc_no", e.target.value.replace(/\D/g, "").slice(0, 11))}
-                  className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
-                    ${values["tc_no"]
-                      ? values["tc_no"].length === 11
-                        ? "border-emerald-400"
-                        : "border-red-300"
-                      : "border-slate-200"}`}
-                  placeholder="11-digit national ID number"
-                />
-                {values["tc_no"] && values["tc_no"].length !== 11 && (
-                  <p className="text-xs text-red-500 font-medium mt-1">
-                    ❌ National ID must be 11 digits ({values["tc_no"].length}/11)
-                  </p>
-                )}
-              </div>
+              {(() => {
+                const tc = values["tc_no"] || ""
+                const result = tc ? validateTC(tc) : null
+                return (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">National ID No *</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={11}
+                      value={tc}
+                      onChange={e => setVal("tc_no", e.target.value.replace(/\D/g, "").slice(0, 11))}
+                      className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
+                        ${!tc ? "border-slate-200"
+                          : result?.ok ? "border-emerald-400"
+                          : "border-red-300"}`}
+                      placeholder="11-digit national ID number"
+                    />
+                    {result && !result.ok && (
+                      <p className="text-xs text-red-500 font-medium mt-1">❌ {result.error}</p>
+                    )}
+                    {result?.ok && (
+                      <p className="text-xs text-emerald-600 font-medium mt-1">✅ Valid national ID</p>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Diğer alanlar */}
               {[
