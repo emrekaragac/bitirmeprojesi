@@ -326,10 +326,60 @@ export default function LandingPage() {
         )}
       </div>
 
-      {/* ── Footer ── */}
-      <div className="text-center py-6 text-slate-400 text-sm border-t border-indigo-100 mt-4">
-        BursIQ © 2025 — Parametric Scholarship Distribution System
-      </div>
+      {/* ── Contact & Footer ── */}
+      <footer className="border-t border-indigo-100 mt-8 bg-white/60">
+        {/* Contact section */}
+        <div className="max-w-3xl mx-auto px-6 py-12 grid sm:grid-cols-3 gap-8">
+          <div className="sm:col-span-1">
+            <div className="flex items-center gap-2 mb-3">
+              <BursIQLogo size={32} />
+              <span className="font-black text-indigo-900 text-base">BursIQ</span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Parametric Scholarship Distribution System — AI-powered, transparent, and fair.
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Platform</p>
+            <ul className="space-y-2">
+              {[
+                { href: "/",      label: "Browse Scholarships" },
+                { href: "/setup", label: "Create a Scholarship" },
+                { href: "/admin", label: "Admin Panel" },
+              ].map(l => (
+                <li key={l.href}>
+                  <a href={l.href} className="text-sm text-slate-500 hover:text-indigo-600 transition font-medium">{l.label}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Contact</p>
+            <ul className="space-y-2">
+              <li className="flex items-center gap-2 text-sm text-slate-500">
+                <span className="text-base">✉️</span>
+                <a href="mailto:bursiq@gmail.com" className="hover:text-indigo-600 transition">bursiq@gmail.com</a>
+              </li>
+              <li className="flex items-center gap-2 text-sm text-slate-500">
+                <span className="text-base">🏛️</span>
+                <span>Management Information Systems</span>
+              </li>
+              <li className="flex items-center gap-2 text-sm text-slate-500">
+                <span className="text-base">📍</span>
+                <span>Faculty of Economics, Administrative &amp; Social Sciences</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom bar */}
+        <div className="border-t border-indigo-50 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <p className="text-xs text-slate-400">© 2025 BursIQ — Parametric Scholarship Distribution System</p>
+          <p className="text-xs text-slate-400">Academic Year 2025–2026</p>
+        </div>
+      </footer>
     </div>
   )
 }
