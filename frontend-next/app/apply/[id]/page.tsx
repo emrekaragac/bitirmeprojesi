@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback, use } from "react"
+import { useState, useEffect, useCallback, use, useRef } from "react"
+import { TURKISH_UNIVERSITIES, getDepartments } from "./turkishUniversityData"
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://bitirmeprojesi-gza2.onrender.com"
 
@@ -184,6 +185,67 @@ function validateTC(tc: string): { ok: boolean; error?: string } {
 function fmt(v?: number | null) {
   if (v == null) return "—"
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(v)
+}
+
+// ── SearchableSelect ─────────────────────────────────────────
+function SearchableSelect({
+  label, options, value, onChange, placeholder,
+}: {
+  label: string
+  options: string[]
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}) {
+  const [query, setQuery] = useState("")
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  const filtered = query.length === 0
+    ? options
+    : options.filter(o => o.toLowerCase().includes(query.toLowerCase()))
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="block text-xs font-semibold text-slate-600 mb-1">{label}</label>
+      <input
+        type="text"
+        value={open ? query : value}
+        placeholder={value || placeholder}
+        onFocus={() => { setQuery(""); setOpen(true) }}
+        onChange={e => { setQuery(e.target.value); setOpen(true) }}
+        className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400 bg-white
+          ${value ? "border-indigo-300" : "border-slate-200"}`}
+      />
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg text-sm">
+          {filtered.map(opt => (
+            <li
+              key={opt}
+              onMouseDown={() => { onChange(opt); setQuery(""); setOpen(false) }}
+              className={`px-3 py-2 cursor-pointer hover:bg-indigo-50 hover:text-indigo-700 font-medium
+                ${opt === value ? "bg-indigo-50 text-indigo-700" : "text-slate-800"}`}
+            >
+              {opt}
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && filtered.length === 0 && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg px-3 py-2 text-sm text-slate-400">
+          No results found
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Main Component ───────────────────────────────────────────
@@ -613,17 +675,20 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                 )}
               </div>
 
-              {[
-                { id: "university", label: "University", type: "text" },
-                { id: "department", label: "Department", type: "text" },
-              ].map(f => (
-                <div key={f.id}>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">{f.label}</label>
-                  <input type={f.type} value={values[f.id] || ""} onChange={e => setVal(f.id, e.target.value)}
-                    className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400
-                      ${values[f.id] ? "border-indigo-300" : "border-slate-200"}`} />
-                </div>
-              ))}
+              <SearchableSelect
+                label="University"
+                options={TURKISH_UNIVERSITIES}
+                value={values.university || ""}
+                onChange={v => { setVal("university", v); setVal("department", ""); }}
+                placeholder="Search university..."
+              />
+              <SearchableSelect
+                label="Department"
+                options={getDepartments(values.university || "")}
+                value={values.department || ""}
+                onChange={v => setVal("department", v)}
+                placeholder="Search department..."
+              />
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Grade / Year</label>
                 <select value={values.grade || ""} onChange={e => setVal("grade", e.target.value)}
