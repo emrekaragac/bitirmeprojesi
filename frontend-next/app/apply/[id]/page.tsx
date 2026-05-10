@@ -1058,8 +1058,11 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               )}
 
               {documents.map(docId => {
-                // Engellilik raporu sadece "has_disability = yes" seçiliyse göster
-                if (docId === "disability_report" && values["has_disability"] !== "yes") return null
+                // Sağlık/engellilik raporu: has_disability=yes VEYA everyone_healthy=no ise göster
+                if (docId === "disability_report") {
+                  const needsHealthDoc = values["has_disability"] === "yes" || values["everyone_healthy"] === "no"
+                  if (!needsHealthDoc) return null
+                }
 
                 const meta   = DOC_LABELS[docId] || { label: docId, icon: "📄" }
                 const file   = files[docId]
