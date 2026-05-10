@@ -207,7 +207,7 @@ def cross_check(form_data: dict, ruhsat_data: Optional[dict], tapu_data: Optiona
                     passed.append("Ruhsat sahibi adı başvuranla uyumlu")
 
     elif has_car == "yes" and not ruhsat_data:
-        notes.append("Araç sahibi olduğu belirtildi ancak ruhsat yüklenmedi")
+        pass
 
     # ── Konut kontrolleri ─────────────────────────────────────
 
