@@ -1,5 +1,6 @@
 import os
 import json
+import difflib
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -343,11 +344,24 @@ async def validate_doc_endpoint(
                         .replace("İ", "I").replace("Ğ", "G")
                         .replace("Ü", "U").replace("Ş", "S")
                         .replace("Ö", "O").replace("Ç", "C"))
+
+            def _fuzzy_ok(token: str, doc: str, threshold: float = 0.82) -> bool:
+                if not token:
+                    return True
+                if token in doc:
+                    return True
+                # Check each word in doc for similarity (handles OCR mis-reads)
+                for word in doc.split():
+                    ratio = difflib.SequenceMatcher(None, token, word).ratio()
+                    if ratio >= threshold:
+                        return True
+                return False
+
             norm_doc  = _norm(ogrenci_adi)
             norm_fn   = _norm(first_name.strip())
             norm_ln   = _norm(last_name.strip())
-            fn_ok = not norm_fn or norm_fn in norm_doc
-            ln_ok = not norm_ln or norm_ln in norm_doc
+            fn_ok = _fuzzy_ok(norm_fn, norm_doc)
+            ln_ok = _fuzzy_ok(norm_ln, norm_doc)
             result["name_match"]    = fn_ok and ln_ok
             result["name_checked"]  = True
         else:
