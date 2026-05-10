@@ -608,27 +608,26 @@ async def scholarship_apply(
             if text and len(text.strip()) > 20:
                 tapu_data = parse_tapu(house_path)
                 print(f"[TAPU] parse_tapu → il={tapu_data.get('il')!r} m²={tapu_data.get('yuzolcumu')!r} nitelik={tapu_data.get('nitelik')!r}")
-                if not city          and tapu_data.get("il"):        city          = tapu_data["il"]
-                if not square_meters and tapu_data.get("yuzolcumu"): square_meters = str(tapu_data["yuzolcumu"])
+                if not city and tapu_data.get("il"): city = tapu_data["il"]
                 nitelik_val = tapu_data.get("nitelik") or ""
+                # parse_tapu yuzolcumu = arsa alanı (KULLANMA — daire m²'si değil)
             else:
                 print("[TAPU] OCR metni yetersiz — fotoğraf PDF, Vision'a geçiliyor")
             ocr_text = tapu_data.get("raw_text", "") if tapu_data else ""
 
-            # Vision: il/ilçe/m²/tapu_turu/nitelik çıkar — fiyat tahmini Vision'dan alınmaz
+            # Vision her zaman çalıştır — daire m²'sini (yuzolcumu) güvenilir şekilde çıkarır
             print(f"[TAPU] Vision öncesi: city={city!r} sqm={square_meters!r} tapu_turu={tapu_turu_val!r} nitelik={nitelik_val!r}")
-            if not (city and square_meters and tapu_turu_val and nitelik_val):
-                vh = analyze_house(house_path)
-                if vh:
-                    print(f"[TAPU] Vision → valid={vh.get('valid')} il={vh.get('il')!r} m²={vh.get('yuzolcumu')!r} tapu_turu={vh.get('tapu_turu')!r} nitelik={vh.get('nitelik')!r}")
-                    if not city:          city          = vh.get("il") or city
-                    if not square_meters: square_meters = str(vh["yuzolcumu"]) if vh.get("yuzolcumu") else square_meters
-                    if not tapu_turu_val: tapu_turu_val = vh.get("tapu_turu") or ""
-                    if not nitelik_val:   nitelik_val   = vh.get("nitelik")   or ""
-                else:
-                    print("[TAPU] Vision None döndü — API hatası veya key yok")
+            vh = analyze_house(house_path)
+            if vh:
+                print(f"[TAPU] Vision → valid={vh.get('valid')} il={vh.get('il')!r} m²={vh.get('yuzolcumu')!r} tapu_turu={vh.get('tapu_turu')!r} nitelik={vh.get('nitelik')!r}")
+                if not city:          city          = vh.get("il") or city
+                # Vision'ın yuzolcumu = daire_m2 (arsa payı < %20 ise None — güvenilmez tahmin yapılmaz)
+                if not square_meters and vh.get("yuzolcumu"):
+                    square_meters = str(vh["yuzolcumu"])
+                if not tapu_turu_val: tapu_turu_val = vh.get("tapu_turu") or ""
+                if not nitelik_val:   nitelik_val   = vh.get("nitelik")   or ""
             else:
-                print("[TAPU] Vision atlandı — tüm alanlar mevcut")
+                print("[TAPU] Vision None döndü — API hatası veya key yok")
 
             print(f"[TAPU] Final: city={city!r} sqm={square_meters!r} tapu_turu={tapu_turu_val!r} nitelik={nitelik_val!r}")
             if city and square_meters:
@@ -905,18 +904,19 @@ async def analyze(
             if tapu_data.get("ocr_success"):
                 if not city and tapu_data.get("il"):
                     city = tapu_data["il"]
-                if not square_meters and tapu_data.get("yuzolcumu"):
-                    square_meters = str(tapu_data["yuzolcumu"])
-            else:
-                vh = analyze_house(house_path)
-                if vh:
-                    if not city          and vh.get("il"):        city          = vh["il"]
-                    if not square_meters and vh.get("yuzolcumu"): square_meters = str(vh["yuzolcumu"])
-                    if vh.get("estimated_value_tl"):
-                        vision_house_result = {"estimated_value": vh["estimated_value_tl"],
-                                               "price_per_m2": vh.get("price_per_m2"),
-                                               "confidence": vh.get("confidence", "medium"),
-                                               "reasoning": vh.get("reasoning", "")}
+                # parse_tapu yuzolcumu = arsa alanı — daire m²'si değil, kullanma
+            # Vision her zaman çalıştır — daire m²'sini güvenilir şekilde belirler
+            vh = analyze_house(house_path)
+            if vh:
+                if not city and vh.get("il"):         city = vh["il"]
+                # Vision yuzolcumu = daire_m2 (arsa payı < %20 ise None döner)
+                if not square_meters and vh.get("yuzolcumu"):
+                    square_meters = str(vh["yuzolcumu"])
+                if vh.get("estimated_value_tl"):
+                    vision_house_result = {"estimated_value": vh["estimated_value_tl"],
+                                           "price_per_m2": vh.get("price_per_m2"),
+                                           "confidence": vh.get("confidence", "medium"),
+                                           "reasoning": vh.get("reasoning", "")}
         except Exception:
             pass
 
