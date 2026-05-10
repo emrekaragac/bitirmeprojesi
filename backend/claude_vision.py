@@ -409,6 +409,79 @@ Sadece JSON döndür:
     }
 
 
+def analyze_health_report(file_path: str) -> Optional[dict]:
+    """
+    Sağlık Kurulu Raporu (heyet raporu) analizi.
+    Döner: {valid, hasta_adi, maluliyet_orani, tanilar, gecerlilik_tarihi, kurum, message}
+    """
+    images = pdf_to_base64(file_path, max_pages=2)
+    if not images:
+        return None
+
+    from datetime import date
+    bugun = date.today().strftime("%d.%m.%Y")
+
+    prompt = f"""Bu belgeyi incele. T.C. resmi sağlık kurumundan düzenlenmiş bir Sağlık Kurulu Raporu / Heyet Raporu olup olmadığını belirle.
+
+GEÇERLİ BELGE TANIMI:
+- "Sağlık Kurulu Raporu", "Heyet Raporu", "Engelli Sağlık Kurulu Raporu" veya "Maluliyet Raporu" başlıklı
+- T.C. devlet hastanesi, üniversite hastanesi veya Sağlık Bakanlığı'na bağlı kurum tarafından düzenlenmiş
+- En az bir doktor imzası veya kurul onayı içermeli
+- Geçerlilik süresi dolmamış olmalı (bugün: {bugun})
+
+ÇIKARILACAK BİLGİLER:
+- Hasta adı soyadı (TC kimlik eşleşmesi için)
+- Maluliyet/engellilik oranı (yüzde olarak, örn. 42)
+- Ana tanı / ICD-10 kodu
+- Geçerlilik bitiş tarihi (varsa)
+- Düzenleyen kurum adı
+
+Sadece JSON döndür:
+{{
+  "is_health_report": true/false,
+  "red_reason": "geçersizse kısa Türkçe neden, yoksa null",
+  "hasta_adi": "tam ad veya null",
+  "tc_no": "11 haneli TC veya null",
+  "kurum": "hastane/kurum adı veya null",
+  "maluliyet_orani": engellilik/maluliyet yüzdesi (sayı, örn. 42) veya null,
+  "ana_tani": "ana tanı açıklaması veya null",
+  "icd_kodu": "ICD-10 kodu örn. M17.1 veya null",
+  "gecerlilik_bitis": "GG.AA.YYYY formatında bitiş tarihi veya null",
+  "suresi_dolmus": true/false
+}}"""
+
+    raw = _call_vision(images, prompt)
+    if not raw:
+        return None
+    data = _parse_json(raw)
+    if not data:
+        return None
+
+    is_valid = bool(data.get("is_health_report")) and not data.get("suresi_dolmus", False)
+
+    if not data.get("is_health_report"):
+        msg = f"❌ {data.get('red_reason', 'Bu belge sağlık kurulu raporu değil.')}"
+    elif data.get("suresi_dolmus"):
+        msg = "❌ Sağlık raporu geçerlilik süresi dolmuş."
+    else:
+        oran = data.get("maluliyet_orani")
+        tani = data.get("ana_tani") or ""
+        msg = f"✅ Geçerli Sağlık Kurulu Raporu.{f' Maluliyet: %{oran}.' if oran else ''}{f' Tanı: {tani[:60]}' if tani else ''}"
+
+    return {
+        "valid":             is_valid,
+        "message":           msg,
+        "hasta_adi":         data.get("hasta_adi"),
+        "tc_no":             data.get("tc_no"),
+        "kurum":             data.get("kurum"),
+        "maluliyet_orani":   data.get("maluliyet_orani"),
+        "ana_tani":          data.get("ana_tani"),
+        "icd_kodu":          data.get("icd_kodu"),
+        "gecerlilik_bitis":  data.get("gecerlilik_bitis"),
+        "suresi_dolmus":     bool(data.get("suresi_dolmus")),
+    }
+
+
 # ── DİĞER BELGELER ────────────────────────────────────────────────────────────
 def analyze_generic(file_path: str, doc_type: str) -> Optional[dict]:
     """Transkript, bordro, öğrenci belgesi vb. için sadece doğrulama."""

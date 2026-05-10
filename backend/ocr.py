@@ -78,7 +78,7 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
       2. Metin yoksa (fotoğraf PDF) → Claude Vision ile görsel analiz
       3. Vision yanıt vermezse → uyarıyla kabul et (bloke etme)
     """
-    from backend.claude_vision import analyze_car, analyze_house, analyze_generic, analyze_transcript, analyze_income
+    from backend.claude_vision import analyze_car, analyze_house, analyze_generic, analyze_transcript, analyze_income, analyze_health_report
 
     sig = DOC_SIGNATURES.get(expected_doc_id)
     if not sig:
@@ -105,6 +105,12 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             elif expected_doc_id == "income_file":
                 pi = parse_income(file_path)
                 extra = {k: pi[k] for k in ("net_aylik", "income_bracket", "kaynak") if pi.get(k) is not None}
+            elif expected_doc_id == "disability_report":
+                hr = analyze_health_report(file_path)
+                if hr:
+                    extra = {k: hr[k] for k in ("hasta_adi","tc_no","kurum","maluliyet_orani","ana_tani","icd_kodu","gecerlilik_bitis","suresi_dolmus") if hr.get(k) is not None}
+                    if hr.get("suresi_dolmus"):
+                        return {"valid": False, "message": "❌ Sağlık raporunun geçerlilik süresi dolmuş.", "confidence": 0.0, "hits": hits}
             elif expected_doc_id == "house_file":
                 from backend.rag_valuation import _classify_property_category
                 pt2 = parse_tapu(file_path)
@@ -142,6 +148,8 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
             result = analyze_transcript(file_path)
         elif expected_doc_id == "income_file":
             result = analyze_income(file_path)
+        elif expected_doc_id == "disability_report":
+            result = analyze_health_report(file_path)
         else:
             result = analyze_generic(file_path, expected_doc_id)
 
@@ -169,6 +177,8 @@ def validate_document(file_path: str, expected_doc_id: str) -> dict:
                 "universite","bolum","sinif","gno","sistem","donem_sayisi","ogrenci_adi",
                 # Gelir
                 "net_aylik","income_bracket","kaynak",
+                # Sağlık raporu
+                "hasta_adi","tc_no","kurum","maluliyet_orani","ana_tani","icd_kodu","gecerlilik_bitis","suresi_dolmus",
             ) if k in result},
         }
 
