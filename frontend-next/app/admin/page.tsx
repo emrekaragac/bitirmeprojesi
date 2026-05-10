@@ -523,13 +523,13 @@ export default function AdminPage() {
                     {fd.has_house === "yes" && (
                       <div>
                         <p className="text-xs font-bold text-slate-500 mb-2">🏠 Property</p>
-                        {(fd.house_province || fd.house_district) && (
-                          <Row label="Location">{[fd.house_province, fd.house_district].filter(Boolean).join(", ")}</Row>
+                        {(fd.city || fd.district) && (
+                          <Row label="Location">{[fd.city, fd.district].filter(Boolean).join(", ")}</Row>
                         )}
-                        {fd.house_size && <Row label="Size">{String(fd.house_size)} m²</Row>}
-                        {fd.estimated_house_value != null && (
+                        {fd.square_meters && <Row label="Size">{String(fd.square_meters)} m²</Row>}
+                        {fd.property_estimated_value != null && (
                           <Row label="Est. Market Value">
-                            <span className="text-emerald-700 font-bold">{fmt(Number(fd.estimated_house_value))}</span>
+                            <span className="text-emerald-700 font-bold">{fmt(Number(fd.property_estimated_value))}</span>
                           </Row>
                         )}
                       </div>
