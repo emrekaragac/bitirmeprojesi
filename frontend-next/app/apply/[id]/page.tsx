@@ -1268,13 +1268,18 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
                             value={values["district"] || ""}
                             onChange={e => setValues(p => ({ ...p, district: e.target.value }))}
                           />
-                          <input
-                            className="col-span-2 px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
-                            placeholder="Area (m²) e.g. 95"
-                            type="number"
-                            value={values["square_meters"] || ""}
-                            onChange={e => setValues(p => ({ ...p, square_meters: e.target.value }))}
-                          />
+                          <div className="col-span-2">
+                            <input
+                              className={`w-full px-2 py-1.5 text-xs border rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 ${!values["square_meters"] ? "border-red-400 ring-1 ring-red-300" : "border-amber-300"}`}
+                              placeholder="Area (m²) — enter manually e.g. 85"
+                              type="number"
+                              value={values["square_meters"] || ""}
+                              onChange={e => setValues(p => ({ ...p, square_meters: e.target.value }))}
+                            />
+                            {!values["square_meters"] && (
+                              <p className="text-red-500 text-[10px] mt-1">⚠️ m² could not be read from the title deed — please enter the apartment size manually.</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}

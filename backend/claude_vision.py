@@ -243,11 +243,12 @@ Sadece JSON döndür, başka metin yazma:
             pay, payda = arsa_payi_str.replace(" ", "").split("/")
             oran = int(pay) / int(payda)
             hesap = round(arsa_m2 * oran)
-            if is_ticari:
-                # Dükkan için makul alt sınır yok — hesabı doğrudan kullan (min 10 m²)
+            # Arsa payı çok düşükse (<%20) tahmin güvenilmez — null bırak, kullanıcı manuel girsin
+            if oran < 0.20:
+                daire_m2 = None
+            elif is_ticari:
                 daire_m2 = max(hesap, 10)
             else:
-                # Konut için 40 m² alt sınır (küçük hesaplar genellikle yanlış)
                 daire_m2 = max(hesap, 40) if hesap < 40 else hesap
         except Exception:
             daire_m2 = None
