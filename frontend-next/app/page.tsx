@@ -376,7 +376,7 @@ export default function LandingPage() {
 
         {/* Bottom bar */}
         <div className="border-t border-indigo-50 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-xs text-slate-400">© 2025 ScholarShip — Parametric Scholarship Distribution System</p>
+          <p className="text-xs text-slate-400">© 2026 ScholarShip — Parametric Scholarship Distribution System</p>
           <p className="text-xs text-slate-400">Academic Year 2025–2026</p>
         </div>
       </footer>
