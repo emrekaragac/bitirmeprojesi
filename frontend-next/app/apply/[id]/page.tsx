@@ -521,7 +521,12 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
 
   const s = scholarship!
   const questions = s.config.questions || []
-  const documents = s.config.documents || []
+  const baseDocuments = s.config.documents || []
+  // Sağlık raporu: başvurucunun cevabına göre dinamik ekle (provider yapılandırmasından bağımsız)
+  const needsHealthDoc = values["has_disability"] === "yes" || values["everyone_healthy"] === "no"
+  const documents = (needsHealthDoc && !baseDocuments.includes("disability_report"))
+    ? [...baseDocuments, "disability_report"]
+    : baseDocuments
   const hasCarDoc   = documents.includes("car_file")
   const hasHouseDoc = documents.includes("house_file")
 

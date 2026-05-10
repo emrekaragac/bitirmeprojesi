@@ -391,18 +391,18 @@ export default function SetupPage() {
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scholarship Name *</label>
                 <input value={config.name} onChange={e => set("name", e.target.value)}
                   placeholder="e.g. 2024 Financial Need Scholarship"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400" />
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Description</label>
                 <textarea value={config.description} onChange={e => set("description", e.target.value)}
                   placeholder="Who is eligible? What is the goal?" rows={3}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400 resize-none" />
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400 resize-none" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Deadline</label>
                 <input type="date" value={config.deadline} onChange={e => set("deadline", e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400" />
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
             </div>
 
