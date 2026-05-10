@@ -61,6 +61,11 @@ def root():
     return {"message": "PSDS API running", "version": "3.0"}
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 # ─────────────────────────────────────────────────────────────
 # DEBUG — sistem bileşenlerini test et
 # ─────────────────────────────────────────────────────────────
