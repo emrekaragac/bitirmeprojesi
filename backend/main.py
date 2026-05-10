@@ -775,6 +775,16 @@ async def scholarship_apply(
     }
     verification = cross_check(form_data_for_check, ruhsat_data, tapu_data)
 
+    # TC doğrulama sonucunu verification'a ekle (DB'ye kaydedilmesi için)
+    verification["tc_valid"] = tc_validation.get("valid")
+    verification["tc_error"] = tc_validation.get("error")
+
+    # QR sonuçlarını da verification'a ekle
+    if qr_car is not None:
+        verification["qr_car"] = qr_car
+    if qr_house is not None:
+        verification["qr_house"] = qr_house
+
     # PDF
     report_path = None
     try:
@@ -807,18 +817,7 @@ async def scholarship_apply(
             "property":   property_debug,
             "transcript": transcript_debug,
         },
-        "verification": {
-            "tc_valid":       tc_validation.get("valid"),
-            "tc_error":       tc_validation.get("error"),
-            "qr_car":         qr_car,
-            "qr_house":       qr_house,
-            "trust_score":    verification.get("trust_score"),
-            "trust_level":    verification.get("trust_level"),
-            "needs_review":   verification.get("needs_review"),
-            "flags":          verification.get("flags"),
-            "notes":          verification.get("notes"),
-            "passed_checks":  verification.get("passed_checks"),
-        },
+        "verification": verification,
     }
 
 
